@@ -1,0 +1,26 @@
+# Core API Framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+
+# Validación y Configuración
+pydantic>=2.9.0
+pydantic-settings>=2.5.0
+python-dotenv>=1.0.1
+email-validator>=2.2.0
+tzdata>=2024.1
+
+# Base de Datos Turso (libSQL)
+libsql-client>=0.3.0
+
+# Seguridad y Criptografía
+argon2-cffi>=23.1.0
+pyjwt>=2.9.0
+python-multipart>=0.0.12
+
+# Generación de Reportes Excel
+openpyxl>=3.1.5
+
+# Pruebas y Cliente HTTP
+pytest>=8.3.0
+pytest-asyncio>=0.24.0
+httpx>=0.27.0

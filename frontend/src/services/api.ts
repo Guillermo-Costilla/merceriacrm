@@ -1,0 +1,43 @@
+export class ApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
+export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const defaultHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  }
+
+  const config: RequestInit = {
+    ...options,
+    credentials: 'include', // Enviar y recibir cookies HttpOnly automáticamente
+    headers: {
+      ...defaultHeaders,
+      ...(options.headers || {}),
+    },
+  }
+
+  const response = await fetch(endpoint, config)
+
+  if (!response.ok) {
+    let errorMessage = `Error del servidor (${response.status})`
+    try {
+      const data = await response.json()
+      if (data && data.detail) {
+        errorMessage = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)
+      } else if (data && data.message) {
+        errorMessage = data.message
+      }
+    } catch {
+      // Si la respuesta no es JSON, se conserva el mensaje genérico
+    }
+    throw new ApiError(errorMessage, response.status)
+  }
+
+  return response.json()
+}
