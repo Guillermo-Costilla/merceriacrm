@@ -124,8 +124,16 @@ async def test_brute_force_lockout_after_five_failed_attempts():
             assert res_locked.status_code == 429
 
     finally:
-        await client_db.execute("DELETE FROM users WHERE email = ?", [test_email.lower()])
-        await client_db.close()
+        try:
+            await client_db.close()
+        except Exception:
+            pass
+        try:
+            cleanup_client = create_db_client()
+            await cleanup_client.execute("DELETE FROM users WHERE email = ?", [test_email.lower()])
+            await cleanup_client.close()
+        except Exception:
+            pass
 
 @pytest.mark.asyncio
 async def test_password_reset_flow():
