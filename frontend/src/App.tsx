@@ -12,12 +12,14 @@ import {
   LogOut,
   UserCheck,
   ShieldCheck,
-  Package
+  Package,
+  Boxes
 } from 'lucide-react'
 
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { Login } from './pages/Login'
 import { Products } from './pages/Products'
+import { Inventory } from './pages/Inventory'
 
 interface HealthData {
   status: string
@@ -37,7 +39,7 @@ interface HealthData {
 
 function MainApp() {
   const { user, loading: authLoading, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<'products' | 'system'>('products')
+  const [activeTab, setActiveTab] = useState<'products' | 'inventory' | 'system'>('products')
   const [health, setHealth] = useState<HealthData | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -126,6 +128,17 @@ function MainApp() {
             Catálogo de Productos
           </button>
           <button
+            onClick={() => setActiveTab('inventory')}
+            className={`py-2.5 px-4 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+              activeTab === 'inventory'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+            }`}
+          >
+            <Boxes className="w-4 h-4" />
+            Inventario & Movimientos
+          </button>
+          <button
             onClick={() => setActiveTab('system')}
             className={`py-2.5 px-4 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors ${
               activeTab === 'system'
@@ -147,6 +160,16 @@ function MainApp() {
             transition={{ duration: 0.2 }}
           >
             <Products />
+          </motion.div>
+        )}
+
+        {activeTab === 'inventory' && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <Inventory />
           </motion.div>
         )}
 
