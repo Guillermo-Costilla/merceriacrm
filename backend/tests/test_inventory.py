@@ -29,8 +29,17 @@ async def auth_client():
         assert login_res.status_code == 200
         yield client
 
-    await client_db.execute("DELETE FROM users WHERE id = ?", [user["id"]])
-    await client_db.close()
+    try:
+        cleanup_db = create_db_client()
+        await cleanup_db.execute("DELETE FROM users WHERE id = ?", [user["id"]])
+        await cleanup_db.close()
+    except Exception:
+        pass
+    finally:
+        try:
+            await client_db.close()
+        except Exception:
+            pass
 
 @pytest.mark.asyncio
 async def test_purchase_entry_movement(auth_client):

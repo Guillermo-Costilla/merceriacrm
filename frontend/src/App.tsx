@@ -13,13 +13,17 @@ import {
   UserCheck,
   ShieldCheck,
   Package,
-  Boxes
+  Boxes,
+  ShoppingCart,
+  Receipt
 } from 'lucide-react'
 
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { Login } from './pages/Login'
 import { Products } from './pages/Products'
 import { Inventory } from './pages/Inventory'
+import { NewSale } from './pages/NewSale'
+import { SalesHistory } from './pages/SalesHistory'
 
 interface HealthData {
   status: string
@@ -39,7 +43,7 @@ interface HealthData {
 
 function MainApp() {
   const { user, loading: authLoading, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<'products' | 'inventory' | 'system'>('products')
+  const [activeTab, setActiveTab] = useState<'sales_new' | 'sales_history' | 'products' | 'inventory' | 'system'>('sales_new')
   const [health, setHealth] = useState<HealthData | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -115,44 +119,88 @@ function MainApp() {
         </div>
 
         {/* Barra de Navegación de Pestañas */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex space-x-1 border-t border-slate-100">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex space-x-1 border-t border-slate-100 overflow-x-auto">
           <button
-            onClick={() => setActiveTab('products')}
-            className={`py-2.5 px-4 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors ${
-              activeTab === 'products'
-                ? 'border-rose-600 text-rose-600'
+            onClick={() => setActiveTab('sales_new')}
+            className={`py-2.5 px-3.5 text-xs font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
+              activeTab === 'sales_new'
+                ? 'border-emerald-600 text-emerald-700 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
             }`}
           >
-            <Package className="w-4 h-4" />
+            <ShoppingCart className="w-4 h-4 text-emerald-600" />
+            Nueva Venta (Cobro)
+          </button>
+          <button
+            onClick={() => setActiveTab('sales_history')}
+            className={`py-2.5 px-3.5 text-xs font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
+              activeTab === 'sales_history'
+                ? 'border-indigo-600 text-indigo-700 font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+            }`}
+          >
+            <Receipt className="w-4 h-4 text-indigo-600" />
+            Historial de Ventas
+          </button>
+          <button
+            onClick={() => setActiveTab('products')}
+            className={`py-2.5 px-3.5 text-xs font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
+              activeTab === 'products'
+                ? 'border-rose-600 text-rose-700 font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+            }`}
+          >
+            <Package className="w-4 h-4 text-rose-600" />
             Catálogo de Productos
           </button>
           <button
             onClick={() => setActiveTab('inventory')}
-            className={`py-2.5 px-4 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+            className={`py-2.5 px-3.5 text-xs font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
               activeTab === 'inventory'
-                ? 'border-indigo-600 text-indigo-600'
+                ? 'border-indigo-600 text-indigo-700 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
             }`}
           >
-            <Boxes className="w-4 h-4" />
+            <Boxes className="w-4 h-4 text-indigo-600" />
             Inventario & Movimientos
           </button>
           <button
             onClick={() => setActiveTab('system')}
-            className={`py-2.5 px-4 text-xs font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+            className={`py-2.5 px-3.5 text-xs font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
               activeTab === 'system'
-                ? 'border-rose-600 text-rose-600'
+                ? 'border-slate-700 text-slate-800 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
             }`}
           >
-            <ShieldCheck className="w-4 h-4" />
+            <ShieldCheck className="w-4 h-4 text-slate-600" />
             Estado del Sistema & BD
           </button>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto w-full px-4 sm:px-6 py-6 flex-1">
+        {activeTab === 'sales_new' && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <NewSale
+              onNavigateToHistory={() => setActiveTab('sales_history')}
+            />
+          </motion.div>
+        )}
+
+        {activeTab === 'sales_history' && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <SalesHistory />
+          </motion.div>
+        )}
+
         {activeTab === 'products' && (
           <motion.div
             initial={{ opacity: 0, y: 6 }}
