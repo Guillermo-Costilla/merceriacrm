@@ -122,72 +122,72 @@ function MainApp() {
         </div>
 
         {/* Barra de Navegación de Pestañas */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex space-x-1 border-t border-slate-100 overflow-x-auto">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 border-t border-slate-100">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`py-2.5 px-3.5 text-xs font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
+            className={`min-w-0 py-2.5 px-2 text-xs font-semibold border-b-2 flex items-center justify-center gap-1.5 text-center transition-colors ${
               activeTab === 'dashboard'
                 ? 'border-rose-600 text-rose-700 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
             }`}
           >
-            <BarChart3 className="w-4 h-4 text-rose-600" />
-            Dashboard & Rentabilidad
+            <BarChart3 className="w-4 h-4 flex-shrink-0 text-rose-600" />
+            <span className="min-w-0">Dashboard & Rentabilidad</span>
           </button>
           <button
             onClick={() => setActiveTab('sales_new')}
-            className={`py-2.5 px-3.5 text-xs font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
+            className={`min-w-0 py-2.5 px-2 text-xs font-semibold border-b-2 flex items-center justify-center gap-1.5 text-center transition-colors ${
               activeTab === 'sales_new'
                 ? 'border-emerald-600 text-emerald-700 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
             }`}
           >
-            <ShoppingCart className="w-4 h-4 text-emerald-600" />
-            Nueva Venta (Cobro)
+            <ShoppingCart className="w-4 h-4 flex-shrink-0 text-emerald-600" />
+            <span className="min-w-0">Nueva Venta (Cobro)</span>
           </button>
           <button
             onClick={() => setActiveTab('sales_history')}
-            className={`py-2.5 px-3.5 text-xs font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
+            className={`min-w-0 py-2.5 px-2 text-xs font-semibold border-b-2 flex items-center justify-center gap-1.5 text-center transition-colors ${
               activeTab === 'sales_history'
                 ? 'border-indigo-600 text-indigo-700 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
             }`}
           >
-            <Receipt className="w-4 h-4 text-indigo-600" />
-            Historial de Ventas
+            <Receipt className="w-4 h-4 flex-shrink-0 text-indigo-600" />
+            <span className="min-w-0">Historial de Ventas</span>
           </button>
           <button
             onClick={() => setActiveTab('products')}
-            className={`py-2.5 px-3.5 text-xs font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
+            className={`min-w-0 py-2.5 px-2 text-xs font-semibold border-b-2 flex items-center justify-center gap-1.5 text-center transition-colors ${
               activeTab === 'products'
                 ? 'border-rose-600 text-rose-700 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
             }`}
           >
-            <Package className="w-4 h-4 text-rose-600" />
-            Catálogo de Productos
+            <Package className="w-4 h-4 flex-shrink-0 text-rose-600" />
+            <span className="min-w-0">Catálogo de Productos</span>
           </button>
           <button
             onClick={() => setActiveTab('inventory')}
-            className={`py-2.5 px-3.5 text-xs font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
+            className={`min-w-0 py-2.5 px-2 text-xs font-semibold border-b-2 flex items-center justify-center gap-1.5 text-center transition-colors ${
               activeTab === 'inventory'
                 ? 'border-indigo-600 text-indigo-700 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
             }`}
           >
-            <Boxes className="w-4 h-4 text-indigo-600" />
-            Inventario & Movimientos
+            <Boxes className="w-4 h-4 flex-shrink-0 text-indigo-600" />
+            <span className="min-w-0">Inventario & Movimientos</span>
           </button>
           <button
             onClick={() => setActiveTab('system')}
-            className={`py-2.5 px-3.5 text-xs font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
+            className={`min-w-0 py-2.5 px-2 text-xs font-semibold border-b-2 flex items-center justify-center gap-1.5 text-center transition-colors ${
               activeTab === 'system'
                 ? 'border-slate-700 text-slate-800 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
             }`}
           >
-            <ShieldCheck className="w-4 h-4 text-slate-600" />
-            Estado del Sistema & BD
+            <ShieldCheck className="w-4 h-4 flex-shrink-0 text-slate-600" />
+            <span className="min-w-0">Estado del Sistema & BD</span>
           </button>
         </div>
       </header>
