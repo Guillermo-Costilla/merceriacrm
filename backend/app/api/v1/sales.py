@@ -1,5 +1,5 @@
 from typing import Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 import libsql_client
 
 from app.core.database import get_db
@@ -11,10 +11,27 @@ from app.schemas.sale import (
     SaleListResponse
 )
 from app.services import sale_service
+from app.services.sales_export_service import build_sales_workbook
 from app.services.sale_service import SaleError
 from app.repositories import sale_repo
 
 router = APIRouter(prefix="/sales", tags=["Ventas"])
+
+@router.get("/export.xlsx")
+async def export_sales_xlsx(
+    month: int = Query(..., ge=1, le=12, description="Mes a exportar (1-12)"),
+    year: int = Query(..., ge=2000, le=2100, description="Año a exportar"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: libsql_client.Client = Depends(get_db)
+):
+    rows = await sale_repo.get_sales_export_rows(db, year=year, month=month)
+    workbook_bytes = build_sales_workbook(rows, year=year, month=month)
+    filename = f"ventas_{year:04d}_{month:02d}.xlsx"
+    return Response(
+        content=workbook_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 @router.get("", response_model=SaleListResponse)
 async def list_sales(

@@ -43,3 +43,29 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
 
   return response.json()
 }
+
+export async function apiFetchBlob(endpoint: string): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    credentials: 'include',
+    headers: {
+      'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    },
+  })
+
+  if (!response.ok) {
+    let errorMessage = `Error del servidor (${response.status})`
+    try {
+      const data = await response.json()
+      if (data && data.detail) {
+        errorMessage = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)
+      } else if (data && data.message) {
+        errorMessage = data.message
+      }
+    } catch {
+      // Keep the generic server error when the response is not JSON.
+    }
+    throw new ApiError(errorMessage, response.status)
+  }
+
+  return response.blob()
+}

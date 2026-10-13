@@ -100,6 +100,8 @@ El frontend y la API comparten el dominio público mediante rewrites, permitiend
 | `pnpm run test:backend` | Ejecuta la suite de pruebas unitarias y de integración con Pytest. |
 | `pnpm --filter frontend build` | Compila el frontend con TypeScript estricto para producción. |
 
+El historial de ventas permite descargar el mes seleccionado como un archivo XLSX con resumen y detalle, incluyendo las ventas anuladas identificadas por separado.
+
 ---
 
 ## Seguridad Implementada

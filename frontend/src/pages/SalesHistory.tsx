@@ -11,7 +11,8 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  RotateCcw
+  RotateCcw,
+  Download
 } from 'lucide-react'
 import type { Sale } from '../types/sale'
 import { saleService } from '../services/saleService'
@@ -36,6 +37,7 @@ export const SalesHistory: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [totalPages, setTotalPages] = useState<number>(1)
   const [totalSales, setTotalSales] = useState<number>(0)
+  const [isExporting, setIsExporting] = useState<boolean>(false)
 
   // Modales
   const [viewSale, setViewSale] = useState<Sale | null>(null)
@@ -126,6 +128,30 @@ export const SalesHistory: React.FC = () => {
     }
   }
 
+  const handleExport = async () => {
+    setIsExporting(true)
+    setErrorMessage(null)
+    try {
+      const file = await saleService.exportSalesXlsx(selectedYear, selectedMonth)
+      const url = URL.createObjectURL(file)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `ventas_${selectedYear}_${String(selectedMonth).padStart(2, '0')}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (err: unknown) {
+      setErrorMessage(
+        err instanceof ApiError
+          ? err.message
+          : 'No se pudo exportar el informe de ventas. Intente nuevamente.'
+      )
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   const months = [
     { value: 1, label: 'Enero' },
     { value: 2, label: 'Febrero' },
@@ -156,6 +182,19 @@ export const SalesHistory: React.FC = () => {
             Registro cronológico de operaciones, desglose de artículos y anulación de comprobantes
           </p>
         </div>
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={isExporting}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isExporting ? (
+            <RefreshCw className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          {isExporting ? 'Preparando Excel...' : 'Exportar Excel'}
+        </button>
       </div>
 
       {/* Alerta de notificación temporal */}

@@ -97,3 +97,38 @@ async def list_sales(
     sales = result_to_dicts(rs_items)
 
     return sales, total
+
+async def get_sales_export_rows(
+    client: libsql_client.Client,
+    year: int,
+    month: int
+) -> List[Dict[str, Any]]:
+    period = f"{year:04d}-{month:02d}"
+    sql = """
+        SELECT
+            s.id AS sale_id,
+            s.sale_number,
+            s.sale_date,
+            s.total_cents,
+            s.total_cost_cents,
+            s.estimated_gross_profit_cents,
+            s.status,
+            s.cancellation_reason,
+            s.cancelled_at,
+            si.product_id,
+            p.sku AS product_sku,
+            p.name AS product_name,
+            si.quantity,
+            si.unit_of_measure,
+            si.unit_price_cents,
+            si.subtotal_cents,
+            si.unit_cost_cents,
+            si.estimated_gross_profit_cents AS item_profit_cents
+        FROM sales s
+        LEFT JOIN sale_items si ON si.sale_id = s.id
+        LEFT JOIN products p ON p.id = si.product_id
+        WHERE strftime('%Y-%m', s.sale_date) = ?
+        ORDER BY s.sale_date ASC, s.sale_number ASC, si.rowid ASC
+    """
+    result = await client.execute(sql, [period])
+    return result_to_dicts(result)

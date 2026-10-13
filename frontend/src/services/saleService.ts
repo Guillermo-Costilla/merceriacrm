@@ -1,4 +1,4 @@
-import { apiFetch } from './api'
+import { apiFetch, apiFetchBlob } from './api'
 import type { 
   Sale, 
   SaleListResponse, 
@@ -19,6 +19,11 @@ export const saleService = {
 
     const qs = query.toString()
     return apiFetch<SaleListResponse>(`/api/sales${qs ? `?${qs}` : ''}`)
+  },
+
+  async exportSalesXlsx(year: number, month: number): Promise<Blob> {
+    const query = new URLSearchParams({ year: String(year), month: String(month) })
+    return apiFetchBlob(`/api/sales/export.xlsx?${query.toString()}`)
   },
 
   async getSale(id: string): Promise<Sale> {
