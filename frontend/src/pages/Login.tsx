@@ -80,7 +80,7 @@ export const Login: React.FC = () => {
           <img
             src="/trazos-logo.jpg"
             alt="Trazos Librería"
-            className="h-40 w-40 rounded-2xl object-contain"
+            className="h-48 w-48 rounded-2xl object-contain"
           />
         </motion.div>
         <motion.h2 

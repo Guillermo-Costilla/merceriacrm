@@ -93,7 +93,7 @@ function MainApp() {
             <img
               src="/trazos-logo.jpg"
               alt="Trazos Librería"
-              className="h-12 w-12 rounded-xl object-contain"
+              className="h-16 w-16 rounded-xl object-contain"
             />
             <div>
               <h1 className="text-base font-bold text-slate-900 tracking-tight leading-none">Trazos Librería</h1>
