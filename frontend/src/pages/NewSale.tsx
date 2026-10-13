@@ -54,8 +54,24 @@ export const NewSale: React.FC<NewSaleProps> = ({ onSaleCompleted, onNavigateToH
   const loadActiveProducts = async () => {
     setLoadingProducts(true)
     try {
-      const res = await productService.getProducts({ page_size: 200, is_active: true })
-      setProducts(res.items)
+      const pageSize = 100
+      const firstPage = await productService.getProducts({
+        page: 1,
+        page_size: pageSize,
+        is_active: true
+      })
+      const allProducts = [...firstPage.items]
+
+      for (let page = 2; page <= firstPage.total_pages; page += 1) {
+        const res = await productService.getProducts({
+          page,
+          page_size: pageSize,
+          is_active: true
+        })
+        allProducts.push(...res.items)
+      }
+
+      setProducts(allProducts)
     } catch {
       setErrorMessage('No se pudo cargar el catálogo de productos.')
     } finally {
