@@ -16,7 +16,7 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    PROJECT_NAME: str = "Mercería CRM"
+    PROJECT_NAME: str = "Trazos Librería"
     VERSION: str = "1.0.0"
     ENVIRONMENT: str = "development"
     
@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    SMTP_FROM: str = "notificaciones@merceria.local"
+    SMTP_FROM: str = "notificaciones@trazos.local"
     FRONTEND_URL: str = "http://localhost:5173"
 
     @property

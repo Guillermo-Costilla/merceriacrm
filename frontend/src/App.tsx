@@ -7,7 +7,6 @@ import {
   Database, 
   Clock, 
   Server, 
-  ShoppingBag, 
   RefreshCw,
   LogOut,
   UserCheck,
@@ -91,11 +90,13 @@ function MainApp() {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-rose-600 flex items-center justify-center text-white shadow-xs shadow-rose-200">
-              <ShoppingBag className="w-5 h-5" />
-            </div>
+            <img
+              src="/trazos-logo.jpg"
+              alt="Trazos Librería"
+              className="h-12 w-12 rounded-xl object-contain"
+            />
             <div>
-              <h1 className="text-base font-bold text-slate-900 tracking-tight leading-none">Mercería CRM</h1>
+              <h1 className="text-base font-bold text-slate-900 tracking-tight leading-none">Trazos Librería</h1>
               <p className="text-[11px] text-slate-500 leading-none mt-1">Control de Stock y Ventas</p>
             </div>
           </div>
@@ -377,7 +378,7 @@ function MainApp() {
       </main>
 
       <footer className="max-w-6xl mx-auto w-full text-center text-xs text-slate-400 py-4 border-t border-slate-200">
-        Mercería CRM — Software de Control de Stock y Ventas • Argentina
+        Trazos Librería — Software de Control de Stock y Ventas • Argentina
       </footer>
     </div>
   )

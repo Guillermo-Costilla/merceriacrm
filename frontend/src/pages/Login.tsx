@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { 
-  ShoppingBag, 
   Lock, 
   Mail, 
   Eye, 
@@ -78,9 +77,11 @@ export const Login: React.FC = () => {
           transition={{ duration: 0.3 }}
           className="flex justify-center"
         >
-          <div className="w-14 h-14 rounded-2xl bg-rose-600 flex items-center justify-center text-white shadow-lg shadow-rose-200">
-            <ShoppingBag className="w-8 h-8" />
-          </div>
+          <img
+            src="/trazos-logo.jpg"
+            alt="Trazos Librería"
+            className="h-40 w-40 rounded-2xl object-contain"
+          />
         </motion.div>
         <motion.h2 
           initial={{ y: -10, opacity: 0 }}
@@ -88,7 +89,7 @@ export const Login: React.FC = () => {
           transition={{ duration: 0.3, delay: 0.1 }}
           className="mt-4 text-center text-2xl font-bold tracking-tight text-slate-900"
         >
-          Mercería CRM
+          Trazos Librería
         </motion.h2>
         <motion.p 
           initial={{ opacity: 0 }}
@@ -138,7 +139,7 @@ export const Login: React.FC = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ejemplo@merceria.com"
+                  placeholder="ejemplo@correo.com"
                   className="block w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-slate-900 placeholder:text-slate-400 bg-white transition-all outline-none"
                 />
               </div>
@@ -281,7 +282,7 @@ export const Login: React.FC = () => {
                       required
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
-                      placeholder="propietario@merceria.com"
+                      placeholder="propietario@correo.com"
                       className="block w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-slate-900 outline-none"
                     />
                   </div>

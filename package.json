@@ -2,7 +2,7 @@
   "name": "merceria-crm-root",
   "version": "1.0.0",
   "private": true,
-  "description": "Sistema de Gestión de Inventario y Ventas para Mercería",
+  "description": "Sistema de Gestión de Stock y Ventas para Trazos Librería",
   "scripts": {
     "dev": "concurrently --kill-others-on-fail --prefix \"[{name}]\" --names \"frontend,backend\" -c \"cyan.bold,green.bold\" \"pnpm --filter frontend dev\" \"pnpm run dev:backend\"",
     "dev:backend": "node ./scripts/run-backend.js",

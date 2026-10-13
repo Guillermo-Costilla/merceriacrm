@@ -1,6 +1,6 @@
-# Mercería CRM — Sistema de Gestión de Inventario y Ventas
+# Trazos Librería — Sistema de Gestión de Stock y Ventas
 
-Sistema web integral de gestión y facturación diseñado para mercerías, con soporte para inventario fraccionable (metros de cinta, elástico) y discreto (unidades, paquetes), control de costos históricos, cálculo de ganancia bruta estimada, base de datos SQLite distribuida en la nube (Turso) y autenticación segura con Argon2id.
+Sistema web integral de gestión y ventas para Trazos Librería, con control de stock por unidades y cantidades fraccionables, costos históricos, cálculo de ganancia bruta estimada, base de datos SQLite distribuida en la nube (Turso) y autenticación segura con Argon2id.
 
 ---
 
