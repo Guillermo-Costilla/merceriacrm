@@ -79,17 +79,13 @@ Al presionar `Ctrl + C`, ambos servicios se detienen limpiamente sin dejar puert
 
 ---
 
-## Despliegue del Frontend en Vercel
+## Despliegue en Vercel
 
-El archivo `vercel.json` configura la instalación del monorepo, la compilación del frontend y el fallback de rutas de la SPA. Importa el repositorio en Vercel dejando **Root Directory** en la raíz del repositorio; cada push a `main` desplegará el frontend.
+El archivo `vercel.json` configura el monorepo como dos servicios de Vercel: FastAPI desde `backend` y Vite desde `frontend`. Importa el repositorio dejando **Root Directory** en la raíz. Las rutas `/api/*` se reescriben al backend y el resto al frontend, por lo que no hace falta definir `VITE_API_URL` para este despliegue; déjala sin configurar para que el navegador use rutas del mismo dominio.
 
-El backend FastAPI no se despliega con esta configuración y debe estar publicado por separado. En Vercel, configura la variable de entorno `VITE_API_URL` para Production, Preview y Development con el origen público del backend, sin `/` al final ni `/api` (por ejemplo, `https://api.tudominio.com`). La variable se incorpora durante la compilación; vuelve a desplegar después de cambiarla.
+Configura en el entorno del servicio backend `ENVIRONMENT=production`, una `SECRET_KEY` segura, `TURSO_DATABASE_URL` y `TURSO_AUTH_TOKEN`. No expongas credenciales del backend con variables `VITE_*`. Para enlaces de recuperación, configura `FRONTEND_URL` con el dominio público de la aplicación.
 
-En el servicio del backend configura `ENVIRONMENT=production`, una `SECRET_KEY` segura, `CORS_ORIGINS` con los orígenes exactos del frontend de Vercel (incluido el dominio personalizado si se usa) y `FRONTEND_URL` con la URL pública del frontend. Configura también `TURSO_DATABASE_URL` y `TURSO_AUTH_TOKEN`; no pongas credenciales del backend en variables `VITE_*`.
-
-La autenticación usa cookies `HttpOnly`, `SameSite=Lax` y `Secure` en producción. Para que el navegador las envíe con las peticiones API, sirve frontend y backend bajo el mismo sitio (por ejemplo, `app.tudominio.com` y `api.tudominio.com`). Si se usan dominios de proveedores distintos, hay que definir una estrategia de cookies y protección CSRF antes de considerar funcional el inicio de sesión.
-
-Verifica la API desplegada en `https://<backend>/api/health` y luego prueba el login desde el dominio de Vercel.
+El frontend y la API comparten el dominio público mediante rewrites, permitiendo el uso de las cookies de sesión `HttpOnly`, `SameSite=Lax` y `Secure` en producción. Después del despliegue, verifica `/api/health` y prueba el inicio de sesión.
 
 ---
 
