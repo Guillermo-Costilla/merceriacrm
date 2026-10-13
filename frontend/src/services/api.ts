@@ -7,6 +7,8 @@ export class ApiError extends Error {
   }
 }
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
+
 export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const defaultHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -22,7 +24,7 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
     },
   }
 
-  const response = await fetch(endpoint, config)
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, config)
 
   if (!response.ok) {
     let errorMessage = `Error del servidor (${response.status})`
