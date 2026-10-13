@@ -12,12 +12,13 @@ router = APIRouter(prefix="/categories", tags=["Categorías"])
 
 @router.get("", response_model=List[CategoryResponse])
 async def list_categories(
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db: libsql_client.Client = Depends(get_db)
 ):
     """
     Retorna todas las categorías activas ordenadas alfabéticamente.
     """
-    return await category_repo.get_all_categories(db)
+    return await category_repo.get_all_categories(db, current_user["business_id"])
 
 @router.post("", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
 async def create_category(
@@ -28,7 +29,7 @@ async def create_category(
     """
     Crea una nueva categoría de productos.
     """
-    existing = await category_repo.get_category_by_name(db, payload.name)
+    existing = await category_repo.get_category_by_name(db, current_user["business_id"], payload.name)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -38,6 +39,7 @@ async def create_category(
     category_id = str(uuid.uuid4())
     cat = await category_repo.create_category(
         client=db,
+        business_id=current_user["business_id"],
         category_id=category_id,
         name=payload.name,
         description=payload.description

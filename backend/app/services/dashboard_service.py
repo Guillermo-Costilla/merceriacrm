@@ -35,6 +35,7 @@ def get_business_day_utc_range(now: datetime) -> tuple[str, str]:
 
 async def get_dashboard_summary(
     client: libsql_client.Client,
+    business_id: str,
     year: Optional[int] = None,
     month: Optional[int] = None
 ) -> DashboardSummaryResponse:
@@ -48,13 +49,14 @@ async def get_dashboard_summary(
     # 1. Ventas de Hoy
     today_sales_data = await dashboard_repo.get_today_sales(
         client,
+        business_id,
         day_start_utc,
         next_day_start_utc
     )
 
     # 2. Resumen del mes seleccionado
-    curr_summary = await dashboard_repo.get_sales_period_summary(client, period_str)
-    curr_units_sold = await dashboard_repo.get_period_units_sold(client, period_str)
+    curr_summary = await dashboard_repo.get_sales_period_summary(client, business_id, period_str)
+    curr_units_sold = await dashboard_repo.get_period_units_sold(client, business_id, period_str)
 
     # 3. Resumen del mes anterior (mes calendario completo y MTD)
     if sel_month == 1:
@@ -69,8 +71,10 @@ async def get_dashboard_summary(
     is_current_month = (sel_year == now_ar.year and sel_month == now_ar.month)
     mtd_day = now_ar.day if is_current_month else None
 
-    prev_full_summary = await dashboard_repo.get_sales_period_summary(client, prev_period_str)
-    prev_mtd_summary = await dashboard_repo.get_sales_period_summary(client, prev_period_str, max_day=mtd_day)
+    prev_full_summary = await dashboard_repo.get_sales_period_summary(client, business_id, prev_period_str)
+    prev_mtd_summary = await dashboard_repo.get_sales_period_summary(
+        client, business_id, prev_period_str, max_day=mtd_day
+    )
 
     # 4. Cálculo de variaciones porcentuales (evitando división por cero)
     curr_sales = curr_summary["total_sales_cents"]
@@ -86,11 +90,11 @@ async def get_dashboard_summary(
         mtd_variation_pct = round(((curr_sales - prev_mtd_sales) / prev_mtd_sales) * 100, 1)
 
     # 5. Indicadores de inventario
-    inventory_kpis = await dashboard_repo.get_inventory_kpis(client)
+    inventory_kpis = await dashboard_repo.get_inventory_kpis(client, business_id)
 
     # 6. Serie diaria para el gráfico (completando los días del mes para visualización continua)
     days_in_month = calendar.monthrange(sel_year, sel_month)[1]
-    raw_series = await dashboard_repo.get_daily_sales_series(client, period_str)
+    raw_series = await dashboard_repo.get_daily_sales_series(client, business_id, period_str)
     series_map = {row["day"]: row for row in raw_series}
 
     daily_points: List[DailySalesPoint] = []
@@ -120,7 +124,7 @@ async def get_dashboard_summary(
             )
 
     # 7. Top 3 productos del período
-    top_prods_raw = await dashboard_repo.get_top_products_period(client, period_str, limit=3)
+    top_prods_raw = await dashboard_repo.get_top_products_period(client, business_id, period_str, limit=3)
     top_products = [
         TopProductItem(
             product_id=p["product_id"],

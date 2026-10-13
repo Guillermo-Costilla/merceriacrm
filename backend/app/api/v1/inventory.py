@@ -23,6 +23,7 @@ async def list_inventory_movements(
     search: Optional[str] = Query(None, description="Búsqueda por nombre de producto, SKU o motivo"),
     page: int = Query(1, ge=1, description="Número de página"),
     page_size: int = Query(25, ge=1, le=100, description="Elementos por página"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db: libsql_client.Client = Depends(get_db)
 ):
     """
@@ -31,6 +32,7 @@ async def list_inventory_movements(
     offset = (page - 1) * page_size
     items, total = await inventory_repo.list_movements(
         client=db,
+        business_id=current_user["business_id"],
         product_id=product_id,
         movement_type=movement_type,
         search=search,
@@ -62,6 +64,7 @@ async def create_inventory_movement(
         movement = await inventory_service.record_manual_movement(
             client=db,
             data=payload,
+            business_id=current_user["business_id"],
             user_id=current_user["id"]
         )
         return movement
@@ -77,4 +80,4 @@ async def get_inventory_reconciliation(
     Ejecuta un informe de reconciliación comparando el stock actual de cada producto
     con la reconstrucción matemática de todos sus movimientos históricos.
     """
-    return await inventory_service.get_reconciliation_report(db)
+    return await inventory_service.get_reconciliation_report(db, current_user["business_id"])

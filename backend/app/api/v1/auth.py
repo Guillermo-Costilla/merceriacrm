@@ -5,6 +5,7 @@ import libsql_client
 from app.core.config import settings
 from app.core.database import get_db
 from app.schemas.auth import (
+    RegisterRequest,
     LoginRequest,
     UserResponse,
     ChangePasswordRequest,
@@ -17,6 +18,39 @@ from app.services.auth_service import AuthError
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
+
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def register(
+    payload: RegisterRequest,
+    request: Request,
+    response: Response,
+    db: libsql_client.Client = Depends(get_db)
+):
+    """Crea un comercio aislado y su primera cuenta de propietario."""
+    try:
+        user, raw_token = await auth_service.register_business(
+            client=db,
+            business_name=payload.business_name,
+            business_logo_data_url=payload.business_logo_data_url,
+            email=payload.email,
+            password=payload.password,
+            full_name=payload.full_name,
+            user_agent=request.headers.get("User-Agent"),
+            ip_address=get_client_ip(request)
+        )
+    except AuthError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+    response.set_cookie(
+        key=settings.SESSION_COOKIE_NAME,
+        value=raw_token,
+        httponly=True,
+        samesite="lax",
+        secure=(settings.ENVIRONMENT == "production"),
+        max_age=settings.SESSION_EXPIRE_HOURS * 3600,
+        path="/"
+    )
+    return user
 
 def get_client_ip(request: Request) -> str:
     forwarded = request.headers.get("X-Forwarded-For")

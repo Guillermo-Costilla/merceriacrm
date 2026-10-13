@@ -9,7 +9,7 @@ async def test_health_check_returns_ok():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["service"] == "Trazos Librería"
+    assert data["service"] == "Mercería CRM"
     assert "timestamp_utc" in data
     assert "timestamp_local" in data
     assert data["timezone"] == "America/Argentina/Tucuman"

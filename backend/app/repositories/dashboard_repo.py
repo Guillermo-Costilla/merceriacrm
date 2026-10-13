@@ -4,6 +4,7 @@ from app.core.database import result_to_dicts
 
 async def get_sales_period_summary(
     client: libsql_client.Client,
+    business_id: str,
     period_str: str,
     max_day: Optional[int] = None
 ) -> Dict[str, Any]:
@@ -11,8 +12,8 @@ async def get_sales_period_summary(
     period_str: 'YYYY-MM'
     max_day: opcional para cálculo Month-To-Date (MTD)
     """
-    where_sql = "s.status = 'COMPLETED' AND strftime('%Y-%m', s.sale_date) = ?"
-    params: List[Any] = [period_str]
+    where_sql = "s.business_id = ? AND s.status = 'COMPLETED' AND strftime('%Y-%m', s.sale_date) = ?"
+    params: List[Any] = [business_id, period_str]
 
     if max_day is not None:
         where_sql += " AND CAST(strftime('%d', s.sale_date) AS INTEGER) <= ?"
@@ -38,19 +39,21 @@ async def get_sales_period_summary(
 
 async def get_period_units_sold(
     client: libsql_client.Client,
+    business_id: str,
     period_str: str
 ) -> float:
     sql = """
         SELECT COALESCE(SUM(si.quantity), 0) as total_units
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.id
-        WHERE s.status = 'COMPLETED' AND strftime('%Y-%m', s.sale_date) = ?
+        WHERE s.business_id = ? AND s.status = 'COMPLETED' AND strftime('%Y-%m', s.sale_date) = ?
     """
-    rs = await client.execute(sql, [period_str])
+    rs = await client.execute(sql, [business_id, period_str])
     return float(rs.rows[0][0]) if rs.rows and rs.rows[0][0] is not None else 0.0
 
 async def get_today_sales(
     client: libsql_client.Client,
+    business_id: str,
     day_start_utc: str,
     next_day_start_utc: str
 ) -> Dict[str, Any]:
@@ -59,9 +62,9 @@ async def get_today_sales(
             COALESCE(SUM(total_cents), 0) as total_cents,
             COUNT(*) as operations_count
         FROM sales
-        WHERE status = 'COMPLETED' AND sale_date >= ? AND sale_date < ?
+        WHERE business_id = ? AND status = 'COMPLETED' AND sale_date >= ? AND sale_date < ?
     """
-    rs = await client.execute(sql, [day_start_utc, next_day_start_utc])
+    rs = await client.execute(sql, [business_id, day_start_utc, next_day_start_utc])
     rows = result_to_dicts(rs)
     if rows:
         return {
@@ -71,7 +74,8 @@ async def get_today_sales(
     return {"total_cents": 0, "operations_count": 0}
 
 async def get_inventory_kpis(
-    client: libsql_client.Client
+    client: libsql_client.Client,
+    business_id: str
 ) -> Dict[str, int]:
     sql = """
         SELECT
@@ -79,8 +83,9 @@ async def get_inventory_kpis(
             COUNT(CASE WHEN is_active = 1 AND current_stock <= min_stock AND current_stock > 0 THEN 1 END) as low_stock,
             COUNT(CASE WHEN is_active = 1 AND current_stock <= 0 THEN 1 END) as out_of_stock
         FROM products
+        WHERE business_id = ?
     """
-    rs = await client.execute(sql)
+    rs = await client.execute(sql, [business_id])
     rows = result_to_dicts(rs)
     if rows:
         return {
@@ -92,6 +97,7 @@ async def get_inventory_kpis(
 
 async def get_daily_sales_series(
     client: libsql_client.Client,
+    business_id: str,
     period_str: str
 ) -> List[Dict[str, Any]]:
     sql = """
@@ -102,15 +108,16 @@ async def get_daily_sales_series(
             SUM(estimated_gross_profit_cents) as profit_cents,
             COUNT(*) as operations_count
         FROM sales
-        WHERE status = 'COMPLETED' AND strftime('%Y-%m', sale_date) = ?
+        WHERE business_id = ? AND status = 'COMPLETED' AND strftime('%Y-%m', sale_date) = ?
         GROUP BY day
         ORDER BY day ASC
     """
-    rs = await client.execute(sql, [period_str])
+    rs = await client.execute(sql, [business_id, period_str])
     return result_to_dicts(rs)
 
 async def get_top_products_period(
     client: libsql_client.Client,
+    business_id: str,
     period_str: str,
     limit: int = 3
 ) -> List[Dict[str, Any]]:
@@ -126,10 +133,10 @@ async def get_top_products_period(
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.id
         JOIN products p ON si.product_id = p.id
-        WHERE s.status = 'COMPLETED' AND strftime('%Y-%m', s.sale_date) = ?
+        WHERE s.business_id = ? AND s.status = 'COMPLETED' AND strftime('%Y-%m', s.sale_date) = ?
         GROUP BY si.product_id
         ORDER BY units_sold DESC
         LIMIT ?
     """
-    rs = await client.execute(sql, [period_str, limit])
+    rs = await client.execute(sql, [business_id, period_str, limit])
     return result_to_dicts(rs)

@@ -18,10 +18,11 @@ class InventoryError(Exception):
 async def record_manual_movement(
     client: libsql_client.Client,
     data: InventoryMovementCreate,
+    business_id: str,
     user_id: Optional[str] = None
 ) -> Dict[str, Any]:
     # 1. Comprobar existencia del producto
-    product = await product_repo.get_product_by_id(client, data.product_id)
+    product = await product_repo.get_product_by_id(client, business_id, data.product_id)
     if not product:
         raise InventoryError("Producto no encontrado", status_code=404)
 
@@ -58,16 +59,16 @@ async def record_manual_movement(
             """
             UPDATE products 
             SET current_stock = ?, updated_at = CURRENT_TIMESTAMP 
-            WHERE id = ? AND current_stock = ?
+            WHERE business_id = ? AND id = ? AND current_stock = ?
             """,
-            [resulting_stock, data.product_id, previous_stock]
+            [resulting_stock, business_id, data.product_id, previous_stock]
         ),
         libsql_client.Statement(
             """
             INSERT INTO inventory_movements (
                 id, product_id, movement_type, quantity, previous_stock, resulting_stock,
-                reason, created_by_user_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                reason, created_by_user_id, business_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 movement_id,
@@ -77,7 +78,8 @@ async def record_manual_movement(
                 previous_stock,
                 resulting_stock,
                 data.reason,
-                user_id
+                user_id,
+                business_id
             ]
         )
     ]
@@ -85,19 +87,20 @@ async def record_manual_movement(
     await client.batch(statements)
 
     # 5. Obtener el registro enriquecido
-    movement = await inventory_repo.get_movement_by_id(client, movement_id)
+    movement = await inventory_repo.get_movement_by_id(client, business_id, movement_id)
     if not movement:
         raise InventoryError("Error al recuperar el movimiento registrado", status_code=500)
 
     return movement
 
 async def get_reconciliation_report(
-    client: libsql_client.Client
+    client: libsql_client.Client,
+    business_id: str
 ) -> InventoryReconciliationReport:
     """
     Compara el stock actual con la reconstrucción histórica de cada producto.
     """
-    rows = await inventory_repo.get_reconciliation_audit(client)
+    rows = await inventory_repo.get_reconciliation_audit(client, business_id)
     items: List[InventoryReconciliationItem] = []
     consistent_count = 0
     discrepancy_count = 0

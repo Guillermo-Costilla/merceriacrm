@@ -1,0 +1,28 @@
+const { spawn } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+
+const isWindows = process.platform === 'win32';
+const backendDir = path.resolve(__dirname, '..', 'backend');
+
+const pythonExe = isWindows
+  ? path.join(backendDir, '.venv', 'Scripts', 'python.exe')
+  : path.join(backendDir, '.venv', 'bin', 'python');
+
+if (!fs.existsSync(pythonExe)) {
+  console.error('\x1b[31m[CLI Error] No se encontró el entorno virtual en:\x1b[0m', pythonExe);
+  process.exit(1);
+}
+
+const cliArguments = process.argv.slice(2).filter((argument) => argument !== '--');
+const args = ['-m', 'app.cli', 'cleanup-legacy', ...cliArguments];
+
+const cliProcess = spawn(pythonExe, args, {
+  cwd: backendDir,
+  stdio: 'inherit',
+  env: { ...process.env, PYTHONUNBUFFERED: '1' }
+});
+
+cliProcess.on('exit', (code) => {
+  process.exit(code || 0);
+});

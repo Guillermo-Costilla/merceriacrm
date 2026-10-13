@@ -16,7 +16,7 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    PROJECT_NAME: str = "Trazos Librería"
+    PROJECT_NAME: str = "Mercería CRM"
     VERSION: str = "1.0.0"
     ENVIRONMENT: str = "development"
     

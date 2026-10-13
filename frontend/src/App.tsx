@@ -9,6 +9,8 @@ import {
   Server, 
   RefreshCw,
   LogOut,
+  Moon,
+  Sun,
   UserCheck,
   ShieldCheck,
   Package,
@@ -25,6 +27,7 @@ import { Products } from './pages/Products'
 import { Inventory } from './pages/Inventory'
 import { NewSale } from './pages/NewSale'
 import { SalesHistory } from './pages/SalesHistory'
+import { BUSINESS_TIME_ZONE } from './utils/formatters'
 
 interface HealthData {
   status: string
@@ -44,10 +47,33 @@ interface HealthData {
 
 function MainApp() {
   const { user, loading: authLoading, logout } = useAuth()
+  const [isDarkTheme, setIsDarkTheme] = useState(() => localStorage.getItem('theme') === 'dark')
   const [activeTab, setActiveTab] = useState<'dashboard' | 'sales_new' | 'sales_history' | 'products' | 'inventory' | 'system'>('dashboard')
   const [health, setHealth] = useState<HealthData | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkTheme)
+    document.documentElement.style.colorScheme = isDarkTheme ? 'dark' : 'light'
+    localStorage.setItem('theme', isDarkTheme ? 'dark' : 'light')
+  }, [isDarkTheme])
+
+  const toggleTheme = () => setIsDarkTheme((current) => !current)
+
+  useEffect(() => {
+    const defaultLogo = user?.business_id === 'legacy-business' ? '/trazos-logo.jpg' : '/favicon.svg'
+    document.title = user
+      ? `${user.business_name} — Gestión de Stock y Ventas`
+      : 'Trazos Librería — Gestión de Stock y Ventas'
+
+    const favicon = document.querySelector<HTMLLinkElement>('link[rel~="icon"]')
+    if (favicon) {
+      favicon.href = user?.business_logo_data_url || defaultLogo
+      const logoType = user?.business_logo_data_url?.match(/^data:(image\/(?:png|jpeg|webp));/)?.[1]
+      favicon.type = logoType || (defaultLogo.endsWith('.svg') ? 'image/svg+xml' : 'image/jpeg')
+    }
+  }, [user])
 
   const checkBackendHealth = async () => {
     setLoading(true)
@@ -74,7 +100,7 @@ function MainApp() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
+      <div className="app-shell min-h-screen bg-slate-50 flex flex-col items-center justify-center">
         <RefreshCw className="w-8 h-8 animate-spin text-rose-600 mb-3" />
         <p className="text-sm text-slate-500 font-medium">Verificando sesión segura...</p>
       </div>
@@ -82,21 +108,21 @@ function MainApp() {
   }
 
   if (!user) {
-    return <Login />
+    return <Login isDarkTheme={isDarkTheme} onToggleTheme={toggleTheme} />
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between font-sans">
+    <div className="app-shell min-h-screen bg-slate-50 flex flex-col justify-between font-sans">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <img
-              src="/trazos-logo.jpg"
-              alt="Trazos Librería"
-              className="h-16 w-16 rounded-xl object-contain"
+              src={user.business_logo_data_url || (user.business_id === 'legacy-business' ? '/trazos-logo.jpg' : '/favicon.svg')}
+              alt={user.business_name}
+              className="h-14 w-14 rounded-xl object-contain"
             />
             <div>
-              <h1 className="text-base font-bold text-slate-900 tracking-tight leading-none">Trazos Librería</h1>
+              <h1 className="text-base font-bold text-slate-900 tracking-tight leading-none">{user.business_name}</h1>
               <p className="text-[11px] text-slate-500 leading-none mt-1">Control de Stock y Ventas</p>
             </div>
           </div>
@@ -109,6 +135,17 @@ function MainApp() {
                 <p className="text-[10px] text-slate-400 leading-none mt-0.5">{user.email}</p>
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={isDarkTheme ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+              title={isDarkTheme ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition-colors"
+            >
+              {isDarkTheme ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{isDarkTheme ? 'Claro' : 'Oscuro'}</span>
+            </button>
 
             <button
               onClick={logout}
@@ -340,7 +377,7 @@ function MainApp() {
                     )}
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
-                    Esquema 001 aplicado • SQLite distribuido en AWS US-East-1
+                    Esquema 002 aplicado • SQLite distribuido en AWS US-East-1
                   </p>
                 </div>
 
@@ -353,7 +390,8 @@ function MainApp() {
                   <p className="text-xs text-slate-500 mt-1 font-mono">
                     {new Date(health.timestamp_local).toLocaleString('es-AR', {
                       dateStyle: 'medium',
-                      timeStyle: 'medium'
+                      timeStyle: 'medium',
+                      timeZone: BUSINESS_TIME_ZONE,
                     })}
                   </p>
                 </div>

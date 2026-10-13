@@ -2,6 +2,8 @@
 
 Sistema web integral de gestión y ventas para Trazos Librería, con control de stock por unidades y cantidades fraccionables, costos históricos, cálculo de ganancia bruta estimada, base de datos SQLite distribuida en la nube (Turso) y autenticación segura con Argon2id.
 
+Cada registro crea un comercio independiente: productos, categorías, ventas, inventario y configuración pertenecen a ese comercio. Los datos que ya existían quedan asignados al espacio heredado de Trazos Librería; la migración no elimina cuentas ni datos.
+
 ---
 
 ## Stack Tecnológico
@@ -44,7 +46,7 @@ pnpm install
 ```
 
 ### 4. Ejecutar Migraciones en Turso
-Crea todas las tablas, restricciones de stock e índices relacionales en la base de datos:
+Crea las tablas, espacios de comercio, identidad visual, restricciones de stock e índices relacionales. La migración de comercios asigna los datos existentes al espacio heredado de Trazos Librería y conserva sus cuentas, productos, ventas e historial:
 ```bash
 pnpm run migrate
 ```
@@ -53,7 +55,7 @@ Para verificar el estado de las migraciones:
 pnpm run migrate:status
 ```
 
-### 5. Crear el Usuario Administrador Inicial
+### 5. Crear el Usuario Administrador Inicial (instalaciones existentes)
 Registrar de forma segura la cuenta del propietario:
 ```bash
 pnpm run admin:create
@@ -73,6 +75,17 @@ pnpm run dev
 La aplicación estará disponible inmediatamente en el navegador en:
 `http://localhost:5173`
 
+Los clientes pueden crear su cuenta desde la pantalla de inicio, indicar el nombre del comercio y cargar opcionalmente un logo PNG, JPG o WEBP de hasta 512 KB. El logo se almacena con el comercio y se muestra en el encabezado y como favicon al iniciar sesión. El registro crea un comercio vacío y una sesión; no comparte el catálogo ni el historial de otros comercios.
+
+Después de que el cliente cree su cuenta y con un respaldo de Turso disponible, la limpieza del espacio heredado es manual:
+```bash
+pnpm run data:cleanup-legacy -- --dry-run
+pnpm run data:cleanup-legacy
+```
+La simulación solo informa qué se eliminaría. La ejecución requiere que ya exista otro comercio y escribir exactamente la frase `BORRAR <nombre mostrado>`; elimina cuentas, sesiones, categorías, productos, ventas, compras, gastos, movimientos, operadores, registros auxiliares y configuración del espacio heredado. No se ejecuta al registrar clientes.
+
+La limpieza comprueba que el historial incluya `004_business_accounts` y que exista el esquema esperado antes de continuar. La versión 004 permite conservar las migraciones 002 y 003 que ya se habían aplicado en Turso antes de revertir los cambios de operadores. La migración mantiene los datos de compras, gastos y registros históricos en el comercio heredado para incluirlos en el conteo y la limpieza posterior.
+
 Vite redirige automáticamente las peticiones de `/api/*` hacia FastAPI, evitando problemas de CORS en desarrollo y garantizando que el navegador nunca tenga acceso a las credenciales secretas de Turso.
 
 Al presionar `Ctrl + C`, ambos servicios se detienen limpiamente sin dejar puertos bloqueados.
@@ -85,7 +98,7 @@ El archivo `vercel.json` configura el monorepo como dos servicios de Vercel: Fas
 
 Configura en el entorno del servicio backend `ENVIRONMENT=production`, una `SECRET_KEY` segura, `TURSO_DATABASE_URL` y `TURSO_AUTH_TOKEN`. No expongas credenciales del backend con variables `VITE_*`. Para enlaces de recuperación, configura `FRONTEND_URL` con el dominio público de la aplicación.
 
-El frontend y la API comparten el dominio público mediante rewrites, permitiendo el uso de las cookies de sesión `HttpOnly`, `SameSite=Lax` y `Secure` en producción. Después del despliegue, verifica `/api/health` y prueba el inicio de sesión.
+El frontend y la API comparten el dominio público mediante rewrites, permitiendo el uso de las cookies de sesión `HttpOnly`, `SameSite=Lax` y `Secure` en producción. Después del despliegue, verifica `/api/health`, migra la base de datos y prueba el registro de un comercio nuevo.
 
 ---
 
@@ -97,6 +110,8 @@ El frontend y la API comparten el dominio público mediante rewrites, permitiend
 | `pnpm run migrate` | Aplica migraciones SQL pendientes en Turso de manera atómica. |
 | `pnpm run migrate:status` | Comprueba si existen migraciones pendientes sin modificar la base de datos. |
 | `pnpm run admin:create` | Crea de forma interactiva la cuenta del propietario. |
+| `pnpm run data:cleanup-legacy -- --dry-run` | Previsualiza la limpieza del espacio heredado sin borrar datos. |
+| `pnpm run data:cleanup-legacy` | Elimina el espacio heredado tras comprobar que hay otro comercio y confirmar explícitamente. |
 | `pnpm run test:backend` | Ejecuta la suite de pruebas unitarias y de integración con Pytest. |
 | `pnpm --filter frontend build` | Compila el frontend con TypeScript estricto para producción. |
 

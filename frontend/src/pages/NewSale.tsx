@@ -15,13 +15,22 @@ import type { Product } from '../types/product'
 import type { Sale } from '../types/sale'
 import { productService } from '../services/productService'
 import { saleService } from '../services/saleService'
-import { formatCurrency, formatQuantity, centsToDecimalString, decimalStringToCents } from '../utils/formatters'
+import {
+  formatCurrency,
+  formatQuantity,
+  centsToDecimalString,
+  formatLocalizedQuantity,
+  parseCurrencyToCents,
+  parseLocalizedQuantity,
+} from '../utils/formatters'
 import { ApiError } from '../services/api'
 
 interface CartItem {
   product: Product
   quantity: number
+  quantityInput: string
   unit_price_cents: number
+  unitPriceInput: string
   subtotal_cents: number
 }
 
@@ -133,25 +142,20 @@ export const NewSale: React.FC<NewSaleProps> = ({ onSaleCompleted, onNavigateToH
         updated[existingIndex] = {
           ...currentItem,
           quantity: newQty,
+          quantityInput: formatLocalizedQuantity(newQty),
           subtotal_cents: subtotal
         }
         return updated
       } else {
-        // Nuevo ítem en carrito
-        const initialQty = 1
-        if (product.current_stock < initialQty) {
-          setErrorMessage(`No hay stock disponible para agregar '${product.name}'.`)
-          return prev
-        }
-
-        const subtotal = Math.round(initialQty * product.price_cents)
         return [
           ...prev,
           {
             product,
-            quantity: initialQty,
+            quantity: 0,
+            quantityInput: '',
             unit_price_cents: product.price_cents,
-            subtotal_cents: subtotal
+            unitPriceInput: centsToDecimalString(product.price_cents),
+            subtotal_cents: 0
           }
         ]
       }
@@ -169,14 +173,15 @@ export const NewSale: React.FC<NewSaleProps> = ({ onSaleCompleted, onNavigateToH
   // Modificar cantidad
   const handleQuantityChange = (productId: string, rawVal: string) => {
     setErrorMessage(null)
-    const val = parseFloat(rawVal)
-    if (isNaN(val) || val <= 0) return
+    const parsedQuantity = parseLocalizedQuantity(rawVal)
 
     setCartItems((prev) =>
       prev.map((item) => {
         if (item.product.id !== productId) return item
 
-        const validQty = item.product.is_fractional ? Math.round(val * 1000) / 1000 : Math.floor(val)
+        const validQty = parsedQuantity !== null && (item.product.is_fractional || parsedQuantity % 1 === 0)
+          ? roundQty(parsedQuantity, item.product.is_fractional)
+          : 0
         if (validQty > item.product.current_stock) {
           setErrorMessage(`La cantidad solicitada supera el stock disponible (${item.product.current_stock} ${item.product.unit_of_measure}).`)
         }
@@ -184,6 +189,7 @@ export const NewSale: React.FC<NewSaleProps> = ({ onSaleCompleted, onNavigateToH
         const subtotal = Math.round(validQty * item.unit_price_cents)
         return {
           ...item,
+          quantityInput: rawVal,
           quantity: validQty,
           subtotal_cents: subtotal
         }
@@ -193,13 +199,14 @@ export const NewSale: React.FC<NewSaleProps> = ({ onSaleCompleted, onNavigateToH
 
   // Modificar precio unitario de la línea
   const handlePriceChange = (productId: string, rawVal: string) => {
-    const cents = decimalStringToCents(rawVal)
+    const cents = parseCurrencyToCents(rawVal) ?? 0
     setCartItems((prev) =>
       prev.map((item) => {
         if (item.product.id !== productId) return item
         const subtotal = Math.round(item.quantity * cents)
         return {
           ...item,
+          unitPriceInput: rawVal,
           unit_price_cents: cents,
           subtotal_cents: subtotal
         }
@@ -233,6 +240,18 @@ export const NewSale: React.FC<NewSaleProps> = ({ onSaleCompleted, onNavigateToH
 
     // Validar stock antes de enviar
     for (const item of cartItems) {
+      if (!item.quantityInput.trim() || item.quantity <= 0) {
+        setErrorMessage(`Ingrese una cantidad válida para '${item.product.name}'.`)
+        return
+      }
+      if (item.product.is_fractional ? parseLocalizedQuantity(item.quantityInput) === null : item.quantity % 1 !== 0) {
+        setErrorMessage(`La cantidad de '${item.product.name}' debe ser ${item.product.is_fractional ? 'un decimal válido (ej: 1,99)' : 'un número entero'}.`)
+        return
+      }
+      if (!item.unitPriceInput.trim() || parseCurrencyToCents(item.unitPriceInput) === null) {
+        setErrorMessage(`Ingrese un precio válido en pesos argentinos para '${item.product.name}' (ej: 1.500,00).`)
+        return
+      }
       if (item.quantity > item.product.current_stock) {
         setErrorMessage(`Stock insuficiente para '${item.product.name}'. Disponible: ${item.product.current_stock}`)
         return
@@ -474,7 +493,7 @@ export const NewSale: React.FC<NewSaleProps> = ({ onSaleCompleted, onNavigateToH
                     <tr className="bg-slate-50/75 border-b border-slate-200/80 text-slate-600 font-semibold">
                       <th className="py-3 px-4">Producto</th>
                       <th className="py-3 px-4 w-32">Cantidad</th>
-                      <th className="py-3 px-4 w-32">Precio Unit. ($)</th>
+                      <th className="py-3 px-4 w-32">Precio Unit. (ARS $)</th>
                       <th className="py-3 px-4 text-right w-28">Subtotal</th>
                       <th className="py-3 px-4 text-center w-12"></th>
                     </tr>
@@ -508,10 +527,10 @@ export const NewSale: React.FC<NewSaleProps> = ({ onSaleCompleted, onNavigateToH
                           <td className="py-3 px-4">
                             <div className="flex items-center space-x-1">
                               <input
-                                type="number"
-                                min={item.product.is_fractional ? '0.001' : '1'}
-                                step={item.product.is_fractional ? '0.25' : '1'}
-                                value={item.quantity}
+                                type="text"
+                                inputMode={item.product.is_fractional ? 'decimal' : 'numeric'}
+                                placeholder={item.product.is_fractional ? 'Ej. 1,99' : 'Ej. 1'}
+                                value={item.quantityInput}
                                 onChange={(e) => handleQuantityChange(item.product.id, e.target.value)}
                                 className={`w-20 px-2 py-1 text-xs border rounded-lg outline-none font-mono text-center font-bold ${
                                   exceedsStock
@@ -531,7 +550,9 @@ export const NewSale: React.FC<NewSaleProps> = ({ onSaleCompleted, onNavigateToH
                               <span className="text-slate-400 text-xs absolute left-2 top-1/2 -translate-y-1/2">$</span>
                               <input
                                 type="text"
-                                value={centsToDecimalString(item.unit_price_cents)}
+                                inputMode="decimal"
+                                placeholder="Ej. 1.500,00"
+                                value={item.unitPriceInput}
                                 onChange={(e) => handlePriceChange(item.product.id, e.target.value)}
                                 className="w-24 pl-5 pr-2 py-1 text-xs border border-slate-200 rounded-lg outline-none focus:border-indigo-500 font-mono text-right text-slate-800 font-semibold"
                               />

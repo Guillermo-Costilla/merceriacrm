@@ -16,7 +16,12 @@ import type {
   UnitOfMeasure 
 } from '../../types/product'
 import { categoryService } from '../../services/productService'
-import { centsToDecimalString, decimalStringToCents } from '../../utils/formatters'
+import {
+  centsToDecimalString,
+  formatLocalizedQuantity,
+  parseCurrencyToCents,
+  parseLocalizedQuantity,
+} from '../../utils/formatters'
 import { ApiError } from '../../services/api'
 
 interface ProductModalProps {
@@ -43,10 +48,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   const [name, setName] = useState('')
   const [categoryId, setCategoryId] = useState<string>('')
   const [description, setDescription] = useState('')
-  const [costInput, setCostInput] = useState('0.00')
-  const [priceInput, setPriceInput] = useState('0.00')
-  const [currentStock, setCurrentStock] = useState<number>(0)
-  const [minStock, setMinStock] = useState<number>(0)
+  const [costInput, setCostInput] = useState('')
+  const [priceInput, setPriceInput] = useState('')
+  const [currentStock, setCurrentStock] = useState('')
+  const [minStock, setMinStock] = useState('')
   const [unitOfMeasure, setUnitOfMeasure] = useState<UnitOfMeasure>('unidad')
   const [isFractional, setIsFractional] = useState<boolean>(false)
 
@@ -67,20 +72,19 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       setDescription(productToEdit.description || '')
       setCostInput(centsToDecimalString(productToEdit.cost_cents))
       setPriceInput(centsToDecimalString(productToEdit.price_cents))
-      setCurrentStock(productToEdit.current_stock)
-      setMinStock(productToEdit.min_stock)
+      setCurrentStock(formatLocalizedQuantity(productToEdit.current_stock))
+      setMinStock(formatLocalizedQuantity(productToEdit.min_stock))
       setUnitOfMeasure(productToEdit.unit_of_measure)
       setIsFractional(productToEdit.is_fractional)
     } else {
-      // Valores por defecto al crear
       setSku('')
       setName('')
       setCategoryId('')
       setDescription('')
-      setCostInput('0.00')
-      setPriceInput('0.00')
-      setCurrentStock(0)
-      setMinStock(0)
+      setCostInput('')
+      setPriceInput('')
+      setCurrentStock('')
+      setMinStock('')
       setUnitOfMeasure('unidad')
       setIsFractional(false)
     }
@@ -94,8 +98,14 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       setIsFractional(true)
     } else if (unit === 'unidad') {
       setIsFractional(false)
-      setCurrentStock((prev) => Math.floor(prev))
-      setMinStock((prev) => Math.floor(prev))
+      setCurrentStock((prev) => {
+        const quantity = parseLocalizedQuantity(prev)
+        return quantity === null ? prev : String(Math.floor(quantity))
+      })
+      setMinStock((prev) => {
+        const quantity = parseLocalizedQuantity(prev)
+        return quantity === null ? prev : String(Math.floor(quantity))
+      })
     }
   }
 
@@ -137,15 +147,27 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       return
     }
 
-    const costCents = decimalStringToCents(costInput)
-    const priceCents = decimalStringToCents(priceInput)
+    const costCents = parseCurrencyToCents(costInput)
+    const priceCents = parseCurrencyToCents(priceInput)
+    const parsedCurrentStock = parseLocalizedQuantity(currentStock)
+    const parsedMinStock = parseLocalizedQuantity(minStock)
 
-    if (costCents < 0 || priceCents < 0) {
-      setErrorMessage('Los costos y precios no pueden ser negativos.')
+    if (costCents === null || priceCents === null) {
+      setErrorMessage('Ingrese costos y precios válidos en pesos argentinos (ej: 1.250,50).')
       return
     }
 
-    if (!isFractional && (currentStock % 1 !== 0 || minStock % 1 !== 0)) {
+    if (parsedCurrentStock === null || parsedMinStock === null) {
+      setErrorMessage('Ingrese el stock actual y mínimo. Use enteros o decimales con coma para cantidades fraccionables.')
+      return
+    }
+
+    if (costCents < 0 || priceCents < 0 || parsedCurrentStock < 0 || parsedMinStock < 0) {
+      setErrorMessage('Los costos, precios y cantidades no pueden ser negativos.')
+      return
+    }
+
+    if (!isFractional && (parsedCurrentStock % 1 !== 0 || parsedMinStock % 1 !== 0)) {
       setErrorMessage(`Para la unidad '${unitOfMeasure}', las cantidades deben ser números enteros.`)
       return
     }
@@ -159,8 +181,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         description: description.trim() ? description.trim() : null,
         cost_cents: costCents,
         price_cents: priceCents,
-        current_stock: currentStock,
-        min_stock: minStock,
+        current_stock: parsedCurrentStock,
+        min_stock: parsedMinStock,
         unit_of_measure: unitOfMeasure,
         is_fractional: isFractional,
       }
@@ -343,12 +365,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-xs">$</span>
                 <input
                   id="modal-cost"
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   required
                   value={costInput}
                   onChange={(e) => setCostInput(e.target.value)}
+                  placeholder="Ej. 1.250,50"
                   className="block w-full pl-7 pr-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none"
                 />
               </div>
@@ -362,12 +384,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-xs">$</span>
                 <input
                   id="modal-price"
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   required
                   value={priceInput}
                   onChange={(e) => setPriceInput(e.target.value)}
+                  placeholder="Ej. 1.800,00"
                   className="block w-full pl-7 pr-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none font-semibold text-slate-900"
                 />
               </div>
@@ -382,12 +404,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({
               </label>
               <input
                 id="modal-stock"
-                type="number"
-                step={isFractional ? '0.01' : '1'}
-                min="0"
+                type="text"
+                inputMode={isFractional ? 'decimal' : 'numeric'}
                 required
                 value={currentStock}
-                onChange={(e) => setCurrentStock(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setCurrentStock(e.target.value)}
+                placeholder={isFractional ? 'Ej. 1,99' : 'Ej. 10'}
                 className="block w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none"
               />
             </div>
@@ -398,12 +420,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({
               </label>
               <input
                 id="modal-minstock"
-                type="number"
-                step={isFractional ? '0.01' : '1'}
-                min="0"
+                type="text"
+                inputMode={isFractional ? 'decimal' : 'numeric'}
                 required
                 value={minStock}
-                onChange={(e) => setMinStock(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setMinStock(e.target.value)}
+                placeholder={isFractional ? 'Ej. 1,99' : 'Ej. 5'}
                 className="block w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none"
               />
             </div>

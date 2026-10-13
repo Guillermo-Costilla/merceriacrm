@@ -14,16 +14,17 @@ class ProductError(Exception):
 async def create_product(
     client: libsql_client.Client,
     data: ProductCreate,
+    business_id: str,
     user_id: Optional[str] = None
 ) -> Dict[str, Any]:
     # 1. Comprobar unicidad de SKU
-    existing = await product_repo.get_product_by_sku(client, data.sku)
+    existing = await product_repo.get_product_by_sku(client, business_id, data.sku)
     if existing:
         raise ProductError(f"Ya existe un producto registrado con el código o SKU '{data.sku}'.", status_code=409)
 
     # 2. Verificar existencia de la categoría si se especificó
     if data.category_id:
-        category = await category_repo.get_category_by_id(client, data.category_id)
+        category = await category_repo.get_category_by_id(client, business_id, data.category_id)
         if not category:
             raise ProductError("La categoría seleccionada no existe.", status_code=404)
 
@@ -42,6 +43,7 @@ async def create_product(
     product_id = str(uuid.uuid4())
     product_dict = {
         "id": product_id,
+        "business_id": business_id,
         "sku": data.sku,
         "name": data.name,
         "category_id": data.category_id,
@@ -63,10 +65,10 @@ async def create_product(
                 """
                 INSERT INTO products (
                     id, sku, name, category_id, description, cost_cents, price_cents,
-                    current_stock, min_stock, unit_of_measure, is_fractional, is_active
+                    current_stock, min_stock, unit_of_measure, is_fractional, is_active, business_id
                 ) VALUES (
                     :id, :sku, :name, :category_id, :description, :cost_cents, :price_cents,
-                    :current_stock, :min_stock, :unit_of_measure, :is_fractional, :is_active
+                    :current_stock, :min_stock, :unit_of_measure, :is_fractional, :is_active, :business_id
                 )
                 """,
                 product_dict
@@ -75,8 +77,8 @@ async def create_product(
                 """
                 INSERT INTO inventory_movements (
                     id, product_id, movement_type, quantity, previous_stock, resulting_stock,
-                    reason, created_by_user_id
-                ) VALUES (?, ?, 'PURCHASE_ENTRY', ?, 0.0, ?, ?, ?)
+                    reason, created_by_user_id, business_id
+                ) VALUES (?, ?, 'PURCHASE_ENTRY', ?, 0.0, ?, ?, ?, ?)
                 """,
                 [
                     movement_id,
@@ -84,12 +86,13 @@ async def create_product(
                     data.current_stock,
                     data.current_stock,
                     "Carga inicial de inventario al crear producto",
-                    user_id
+                    user_id,
+                    business_id
                 ]
             )
         ]
         await client.batch(statements)
-        created = await product_repo.get_product_by_id(client, product_id)
+        created = await product_repo.get_product_by_id(client, business_id, product_id)
         return created # type: ignore
     else:
         created = await product_repo.create_product(client, product_dict)
@@ -97,22 +100,23 @@ async def create_product(
 
 async def update_product(
     client: libsql_client.Client,
+    business_id: str,
     product_id: str,
     data: ProductUpdate
 ) -> Dict[str, Any]:
-    current = await product_repo.get_product_by_id(client, product_id)
+    current = await product_repo.get_product_by_id(client, business_id, product_id)
     if not current:
         raise ProductError("Producto no encontrado", status_code=404)
 
     # Si se actualiza el SKU, verificar que no colisione con otro producto
     if data.sku and data.sku != current["sku"]:
-        existing = await product_repo.get_product_by_sku(client, data.sku)
+        existing = await product_repo.get_product_by_sku(client, business_id, data.sku)
         if existing and existing["id"] != product_id:
             raise ProductError(f"Ya existe otro producto con el código o SKU '{data.sku}'.", status_code=409)
 
     # Si se actualiza la categoría, verificar existencia
     if data.category_id and data.category_id != current["category_id"]:
-        category = await category_repo.get_category_by_id(client, data.category_id)
+        category = await category_repo.get_category_by_id(client, business_id, data.category_id)
         if not category:
             raise ProductError("La categoría seleccionada no existe.", status_code=404)
 
@@ -140,45 +144,47 @@ async def update_product(
             status_code=422
         )
 
-    updated = await product_repo.update_product(client, product_id, update_fields)
+    updated = await product_repo.update_product(client, business_id, product_id, update_fields)
     return updated
 
 async def set_product_status(
     client: libsql_client.Client,
+    business_id: str,
     product_id: str,
     is_active: bool
 ) -> Dict[str, Any]:
-    current = await product_repo.get_product_by_id(client, product_id)
+    current = await product_repo.get_product_by_id(client, business_id, product_id)
     if not current:
         raise ProductError("Producto no encontrado", status_code=404)
 
-    await product_repo.set_product_active(client, product_id, is_active)
-    updated = await product_repo.get_product_by_id(client, product_id)
+    await product_repo.set_product_active(client, business_id, product_id, is_active)
+    updated = await product_repo.get_product_by_id(client, business_id, product_id)
     return updated # type: ignore
 
 async def delete_or_deactivate_product(
     client: libsql_client.Client,
+    business_id: str,
     product_id: str
 ) -> Dict[str, Any]:
     """
     Desactiva lógicamente el producto si posee movimientos/ventas.
     Si nunca tuvo operaciones, permite borrado físico.
     """
-    current = await product_repo.get_product_by_id(client, product_id)
+    current = await product_repo.get_product_by_id(client, business_id, product_id)
     if not current:
         raise ProductError("Producto no encontrado", status_code=404)
 
-    has_history = await product_repo.check_product_has_movements(client, product_id)
+    has_history = await product_repo.check_product_has_movements(client, business_id, product_id)
     if has_history:
         # Desactivación lógica para preservar el historial
-        await product_repo.set_product_active(client, product_id, False)
+        await product_repo.set_product_active(client, business_id, product_id, False)
         return {
             "action": "deactivated",
             "message": f"El producto '{current['name']}' fue desactivado porque posee historial de ventas o inventario."
         }
     else:
         # Borrado físico seguro ya que no tiene dependencias
-        await product_repo.delete_product_physical(client, product_id)
+        await product_repo.delete_product_physical(client, business_id, product_id)
         return {
             "action": "deleted",
             "message": f"El producto '{current['name']}' fue eliminado exitosamente."

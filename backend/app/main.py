@@ -11,7 +11,7 @@ from app.api.v1 import api_v1_router
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="API de Gestión de Stock y Ventas para Trazos Librería",
+    description="Sistema de gestión de inventario y ventas por comercio.",
     docs_url="/docs" if settings.ENVIRONMENT == "development" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT == "development" else None,
 )

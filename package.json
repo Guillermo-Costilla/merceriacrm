@@ -10,6 +10,7 @@
     "migrate": "node ./scripts/run-migrations.js",
     "migrate:status": "node ./scripts/run-migrations.js --check",
     "admin:create": "node ./scripts/create-admin.js",
+    "data:cleanup-legacy": "node ./scripts/cleanup-legacy-data.js",
     "test:backend": "node ./scripts/run-backend-tests.js",
     "test:frontend": "pnpm --filter frontend test",
     "build": "pnpm --filter frontend build"

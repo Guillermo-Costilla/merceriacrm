@@ -14,13 +14,14 @@ class SaleError(Exception):
 async def create_sale(
     client: libsql_client.Client,
     data: SaleCreate,
+    business_id: str,
     user_id: Optional[str] = None
 ) -> Dict[str, Any]:
     # 1. Comprobar clave de idempotencia para prevenir dobles cobros
     if data.idempotency_key:
-        existing = await sale_repo.get_sale_by_idempotency_key(client, data.idempotency_key)
+        existing = await sale_repo.get_sale_by_idempotency_key(client, business_id, data.idempotency_key)
         if existing:
-            items = await sale_repo.get_sale_items(client, existing["id"])
+            items = await sale_repo.get_sale_items(client, business_id, existing["id"])
             existing["items"] = items
             return existing
 
@@ -40,7 +41,7 @@ async def create_sale(
     # Consultar productos y validar reglas
     products_map: Dict[str, Dict[str, Any]] = {}
     for pid, total_qty in product_requested_qtys.items():
-        prod = await product_repo.get_product_by_id(client, pid)
+        prod = await product_repo.get_product_by_id(client, business_id, pid)
         if not prod:
             raise SaleError(f"El producto con ID '{pid}' no existe.", status_code=404)
         if not prod.get("is_active"):
@@ -91,7 +92,7 @@ async def create_sale(
         })
 
     estimated_gross_profit_cents = total_cents - total_cost_cents
-    next_number = await sale_repo.get_next_sale_number(client)
+    next_number = await sale_repo.get_next_sale_number(client, business_id)
 
     # 3. Construir transacciones atómicas de inserción y descuento de inventario
     # Cabecera de venta
@@ -100,8 +101,8 @@ async def create_sale(
             """
             INSERT INTO sales (
                 id, sale_number, total_cents, total_cost_cents, estimated_gross_profit_cents,
-                status, notes, idempotency_key, created_by_user_id
-            ) VALUES (?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?)
+                status, notes, idempotency_key, created_by_user_id, business_id
+            ) VALUES (?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?)
             """,
             [
                 sale_id,
@@ -111,7 +112,8 @@ async def create_sale(
                 estimated_gross_profit_cents,
                 data.notes,
                 data.idempotency_key,
-                user_id
+                user_id,
+                business_id
             ]
         )
     )
@@ -152,9 +154,9 @@ async def create_sale(
                 """
                 UPDATE products 
                 SET current_stock = ?, updated_at = CURRENT_TIMESTAMP 
-                WHERE id = ? AND current_stock >= ?
+                WHERE business_id = ? AND id = ? AND current_stock >= ?
                 """,
-                [new_stock, pid, total_qty]
+                [new_stock, business_id, pid, total_qty]
             )
         )
 
@@ -164,8 +166,8 @@ async def create_sale(
                 """
                 INSERT INTO inventory_movements (
                     id, product_id, movement_type, quantity, previous_stock, resulting_stock,
-                    reason, reference_sale_id, created_by_user_id
-                ) VALUES (?, ?, 'SALE_EXIT', ?, ?, ?, ?, ?, ?)
+                    reason, reference_sale_id, created_by_user_id, business_id
+                ) VALUES (?, ?, 'SALE_EXIT', ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     str(uuid.uuid4()),
@@ -175,7 +177,8 @@ async def create_sale(
                     new_stock,
                     f"Venta #{next_number}",
                     sale_id,
-                    user_id
+                    user_id,
+                    business_id
                 ]
             )
         )
@@ -184,7 +187,7 @@ async def create_sale(
     await client.batch(batch_statements)
 
     # 5. Retornar venta completa creada
-    sale = await sale_repo.get_sale_by_id(client, sale_id)
+    sale = await sale_repo.get_sale_by_id(client, business_id, sale_id)
     if not sale:
         raise SaleError("Error al recuperar la venta registrada", status_code=500)
 
@@ -193,18 +196,19 @@ async def create_sale(
 
 async def cancel_sale(
     client: libsql_client.Client,
+    business_id: str,
     sale_id: str,
     reason: str,
     user_id: Optional[str] = None
 ) -> Dict[str, Any]:
-    sale = await sale_repo.get_sale_by_id(client, sale_id)
+    sale = await sale_repo.get_sale_by_id(client, business_id, sale_id)
     if not sale:
         raise SaleError("Venta no encontrada", status_code=404)
 
     if sale["status"] == "CANCELLED":
         raise SaleError("La venta ya se encuentra anulada previamente.", status_code=400)
 
-    items = await sale_repo.get_sale_items(client, sale_id)
+    items = await sale_repo.get_sale_items(client, business_id, sale_id)
     batch_statements: List[libsql_client.Statement] = []
 
     # 1. Cambiar estado a CANCELLED
@@ -213,9 +217,9 @@ async def cancel_sale(
             """
             UPDATE sales 
             SET status = 'CANCELLED', cancellation_reason = ?, cancelled_at = CURRENT_TIMESTAMP 
-            WHERE id = ? AND status = 'COMPLETED'
+            WHERE business_id = ? AND id = ? AND status = 'COMPLETED'
             """,
-            [reason.strip(), sale_id]
+            [reason.strip(), business_id, sale_id]
         )
     )
 
@@ -223,7 +227,7 @@ async def cancel_sale(
     for it in items:
         pid = it["product_id"]
         qty = float(it["quantity"])
-        prod = await product_repo.get_product_by_id(client, pid)
+        prod = await product_repo.get_product_by_id(client, business_id, pid)
         prev_stock = float(prod["current_stock"]) if prod else 0.0
         new_stock = round(prev_stock + qty, 3)
 
@@ -232,9 +236,9 @@ async def cancel_sale(
                 """
                 UPDATE products 
                 SET current_stock = current_stock + ?, updated_at = CURRENT_TIMESTAMP 
-                WHERE id = ?
+                WHERE business_id = ? AND id = ?
                 """,
-                [qty, pid]
+                [qty, business_id, pid]
             )
         )
 
@@ -243,8 +247,8 @@ async def cancel_sale(
                 """
                 INSERT INTO inventory_movements (
                     id, product_id, movement_type, quantity, previous_stock, resulting_stock,
-                    reason, reference_sale_id, created_by_user_id
-                ) VALUES (?, ?, 'SALE_REVERSION', ?, ?, ?, ?, ?, ?)
+                    reason, reference_sale_id, created_by_user_id, business_id
+                ) VALUES (?, ?, 'SALE_REVERSION', ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     str(uuid.uuid4()),
@@ -254,7 +258,8 @@ async def cancel_sale(
                     new_stock,
                     f"Anulación Venta #{sale['sale_number']}: {reason.strip()}",
                     sale_id,
-                    user_id
+                    user_id,
+                    business_id
                 ]
             )
         )
@@ -262,7 +267,7 @@ async def cancel_sale(
     # 3. Ejecución atómica de reversión en Turso
     await client.batch(batch_statements)
 
-    cancelled_sale = await sale_repo.get_sale_by_id(client, sale_id)
+    cancelled_sale = await sale_repo.get_sale_by_id(client, business_id, sale_id)
     if not cancelled_sale:
         raise SaleError("Error al recuperar la venta anulada", status_code=500)
 

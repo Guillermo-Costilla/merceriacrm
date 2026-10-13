@@ -4,6 +4,7 @@ from app.core.database import result_to_dicts
 
 async def get_movement_by_id(
     client: libsql_client.Client,
+    business_id: str,
     movement_id: str
 ) -> Optional[Dict[str, Any]]:
     sql = """
@@ -16,22 +17,23 @@ async def get_movement_by_id(
         FROM inventory_movements m
         JOIN products p ON m.product_id = p.id
         LEFT JOIN users u ON m.created_by_user_id = u.id
-        WHERE m.id = ?
+    WHERE m.business_id = ? AND m.id = ?
     """
-    rs = await client.execute(sql, [movement_id])
+    rs = await client.execute(sql, [business_id, movement_id])
     rows = result_to_dicts(rs)
     return rows[0] if rows else None
 
 async def list_movements(
     client: libsql_client.Client,
+    business_id: str,
     product_id: Optional[str] = None,
     movement_type: Optional[str] = None,
     search: Optional[str] = None,
     limit: int = 50,
     offset: int = 0
 ) -> Tuple[List[Dict[str, Any]], int]:
-    where_clauses = ["1=1"]
-    params: List[Any] = []
+    where_clauses = ["m.business_id = ?"]
+    params: List[Any] = [business_id]
 
     if product_id:
         where_clauses.append("m.product_id = ?")
@@ -78,7 +80,8 @@ async def list_movements(
     return items, total
 
 async def get_reconciliation_audit(
-    client: libsql_client.Client
+    client: libsql_client.Client,
+    business_id: str
 ) -> List[Dict[str, Any]]:
     """
     Calcula la suma algebraica de movimientos históricos para cada producto y la compara con current_stock.
@@ -99,8 +102,9 @@ async def get_reconciliation_audit(
             ), 0.0) as calculated_stock
         FROM products p
         LEFT JOIN inventory_movements m ON p.id = m.product_id
+        WHERE p.business_id = ?
         GROUP BY p.id
         ORDER BY p.name ASC
     """
-    rs = await client.execute(sql)
+    rs = await client.execute(sql, [business_id])
     return result_to_dicts(rs)

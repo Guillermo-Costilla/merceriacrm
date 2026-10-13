@@ -27,6 +27,7 @@ async def get_dashboard(
     """
     return await dashboard_service.get_dashboard_summary(
         client=db,
+        business_id=current_user["business_id"],
         year=year,
         month=month
     )

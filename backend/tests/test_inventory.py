@@ -4,7 +4,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 from app.core.database import create_db_client
-from app.services import auth_service
+from tests.helpers import cleanup_test_business, create_test_business
 
 @pytest.fixture
 async def auth_client():
@@ -13,8 +13,9 @@ async def auth_client():
     email = f"inv_admin_{unique}@example.com"
     password = "SuperPassword123*"
     
-    user = await auth_service.create_initial_admin(
+    user = await create_test_business(
         client=client_db,
+        business_name=f"Comercio inventario {unique}",
         email=email,
         password=password,
         full_name="Admin Inventario"
@@ -31,7 +32,7 @@ async def auth_client():
 
     try:
         cleanup_db = create_db_client()
-        await cleanup_db.execute("DELETE FROM users WHERE id = ?", [user["id"]])
+        await cleanup_test_business(cleanup_db, user["business_id"])
         await cleanup_db.close()
     except Exception:
         pass

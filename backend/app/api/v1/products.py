@@ -27,6 +27,7 @@ async def list_products(
     order_dir: str = Query("asc", description="Dirección: asc o desc"),
     page: int = Query(1, ge=1, description="Número de página"),
     page_size: int = Query(20, ge=1, le=100, description="Elementos por página"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db: libsql_client.Client = Depends(get_db)
 ):
     """
@@ -35,6 +36,7 @@ async def list_products(
     offset = (page - 1) * page_size
     items, total = await product_repo.list_products(
         client=db,
+        business_id=current_user["business_id"],
         search=search,
         category_id=category_id,
         stock_status=stock_status,
@@ -58,12 +60,13 @@ async def list_products(
 @router.get("/{product_id}", response_model=ProductResponse)
 async def get_product(
     product_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
     db: libsql_client.Client = Depends(get_db)
 ):
     """
     Obtiene los detalles completos de un producto específico.
     """
-    product = await product_repo.get_product_by_id(db, product_id)
+    product = await product_repo.get_product_by_id(db, current_user["business_id"], product_id)
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado")
     return product
@@ -81,6 +84,7 @@ async def create_product(
         created = await product_service.create_product(
             client=db,
             data=payload,
+            business_id=current_user["business_id"],
             user_id=current_user["id"]
         )
         return created
@@ -100,6 +104,7 @@ async def update_product(
     try:
         updated = await product_service.update_product(
             client=db,
+            business_id=current_user["business_id"],
             product_id=product_id,
             data=payload
         )
@@ -120,6 +125,7 @@ async def toggle_product_status(
     try:
         updated = await product_service.set_product_status(
             client=db,
+            business_id=current_user["business_id"],
             product_id=product_id,
             is_active=payload.is_active
         )
@@ -139,6 +145,7 @@ async def delete_product(
     try:
         result = await product_service.delete_or_deactivate_product(
             client=db,
+            business_id=current_user["business_id"],
             product_id=product_id
         )
         return result

@@ -6,6 +6,7 @@ from app.main import app
 from app.core.database import create_db_client
 from app.core import security
 from app.services import auth_service
+from tests.helpers import cleanup_test_business, create_test_business
 
 @pytest.mark.asyncio
 async def test_argon2id_hashing_and_verification():
@@ -23,11 +24,13 @@ async def test_auth_full_lifecycle():
     test_email = f"propietario_{unique_suffix}@example.com"
     test_password = "PasswordSeguro2026*"
     test_name = "Doña Clara Test"
+    user = None
 
     try:
         # 1. Crear usuario de prueba
-        user = await auth_service.create_initial_admin(
+        user = await create_test_business(
             client=client_db,
+            business_name=f"Comercio auth {unique_suffix}",
             email=test_email,
             password=test_password,
             full_name=test_name
@@ -80,8 +83,8 @@ async def test_auth_full_lifecycle():
             assert me_after_logout.status_code == 401
 
     finally:
-        # Limpieza de usuario de prueba y sus relaciones en Turso
-        await client_db.execute("DELETE FROM users WHERE email = ?", [test_email.lower()])
+        if user:
+            await cleanup_test_business(client_db, user["business_id"])
         await client_db.close()
 
 @pytest.mark.asyncio
@@ -90,10 +93,12 @@ async def test_brute_force_lockout_after_five_failed_attempts():
     unique_suffix = str(uuid.uuid4())[:8]
     test_email = f"lockout_{unique_suffix}@example.com"
     test_password = "PasswordValido123"
+    user = None
 
     try:
-        await auth_service.create_initial_admin(
+        user = await create_test_business(
             client=client_db,
+            business_name=f"Comercio lockout {unique_suffix}",
             email=test_email,
             password=test_password,
             full_name="Usuario Bloqueo"
@@ -130,7 +135,8 @@ async def test_brute_force_lockout_after_five_failed_attempts():
             pass
         try:
             cleanup_client = create_db_client()
-            await cleanup_client.execute("DELETE FROM users WHERE email = ?", [test_email.lower()])
+            if user:
+                await cleanup_test_business(cleanup_client, user["business_id"])
             await cleanup_client.close()
         except Exception:
             pass
@@ -142,10 +148,12 @@ async def test_password_reset_flow():
     test_email = f"reset_{unique_suffix}@example.com"
     test_password = "PasswordOriginal123"
     new_password = "NuevoPassword2026!"
+    user = None
 
     try:
-        await auth_service.create_initial_admin(
+        user = await create_test_business(
             client=client_db,
+            business_name=f"Comercio reset {unique_suffix}",
             email=test_email,
             password=test_password,
             full_name="Usuario Reset"
@@ -179,5 +187,69 @@ async def test_password_reset_flow():
             assert login_new.status_code == 200
 
     finally:
-        await client_db.execute("DELETE FROM users WHERE email = ?", [test_email.lower()])
+        if user:
+            await cleanup_test_business(client_db, user["business_id"])
+        await client_db.close()
+
+@pytest.mark.asyncio
+async def test_business_registration_isolates_catalogs():
+    client_db = create_db_client()
+    suffix = str(uuid.uuid4())[:8]
+    sku = f"PRIV-{suffix.upper()}"
+    accounts = [
+        {
+            "business_name": f"Comercio A {suffix}",
+            "full_name": "Propietaria A",
+            "email": f"propietaria_a_{suffix}@example.com",
+            "password": "PasswordSeguro2026*",
+        },
+        {
+            "business_name": f"Comercio B {suffix}",
+            "full_name": "Propietaria B",
+            "email": f"propietaria_b_{suffix}@example.com",
+            "password": "PasswordSeguro2026*",
+        },
+    ]
+    business_ids = []
+
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            unauthenticated_products = await client.get("/api/products")
+            assert unauthenticated_products.status_code == 401
+
+            owner_responses = []
+            for account in accounts:
+                response = await client.post("/api/auth/register", json=account)
+                assert response.status_code == 201
+                assert response.json()["business_name"] == account["business_name"]
+                assert "merceria_session" in response.cookies
+                business_ids.append(response.json()["business_id"])
+                owner_responses.append(response)
+
+            assert business_ids[0] != business_ids[1]
+            product_payload = {
+                "sku": sku,
+                "name": "Producto aislado",
+                "cost_cents": 100,
+                "price_cents": 200,
+                "current_stock": 0,
+                "min_stock": 0,
+                "unit_of_measure": "unidad",
+                "is_fractional": False,
+            }
+
+            products = []
+            for response in owner_responses:
+                client.cookies.set("merceria_session", response.cookies["merceria_session"])
+                product_response = await client.post("/api/products", json=product_payload)
+                assert product_response.status_code == 201
+                products.append(product_response.json())
+
+            assert products[0]["id"] != products[1]["id"]
+            client.cookies.set("merceria_session", owner_responses[0].cookies["merceria_session"])
+            foreign_product = await client.get(f"/api/products/{products[1]['id']}")
+            assert foreign_product.status_code == 404
+    finally:
+        for business_id in business_ids:
+            await cleanup_test_business(client_db, business_id)
         await client_db.close()

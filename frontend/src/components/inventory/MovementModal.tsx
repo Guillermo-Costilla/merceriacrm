@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import type { Product } from '../../types/product'
 import type { InventoryMovementCreateData } from '../../types/inventory'
-import { formatQuantity } from '../../utils/formatters'
+import { formatQuantity, parseLocalizedQuantity } from '../../utils/formatters'
 import { ApiError } from '../../services/api'
 
 interface MovementModalProps {
@@ -31,7 +31,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
 }) => {
   const [selectedProductId, setSelectedProductId] = useState<string>('')
   const [movementType, setMovementType] = useState<'PURCHASE_ENTRY' | 'ADJUSTMENT_POSITIVE' | 'ADJUSTMENT_NEGATIVE'>('PURCHASE_ENTRY')
-  const [quantity, setQuantity] = useState<number>(1)
+  const [quantityInput, setQuantityInput] = useState('')
   const [reason, setReason] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -40,7 +40,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
     if (isOpen) {
       setSelectedProductId(initialProductId || (products.length > 0 ? products[0].id : ''))
       setMovementType('PURCHASE_ENTRY')
-      setQuantity(1)
+      setQuantityInput('')
       setReason('')
       setErrorMessage(null)
     }
@@ -52,6 +52,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
   const currentStock = selectedProduct ? selectedProduct.current_stock : 0
   const isFractional = selectedProduct ? selectedProduct.is_fractional : false
   const unit = selectedProduct ? selectedProduct.unit_of_measure : 'unidad'
+  const quantity = parseLocalizedQuantity(quantityInput) ?? 0
 
   let resultingStock = currentStock
   if (movementType === 'PURCHASE_ENTRY' || movementType === 'ADJUSTMENT_POSITIVE') {
@@ -72,7 +73,7 @@ export const MovementModal: React.FC<MovementModalProps> = ({
       return
     }
 
-    if (!quantity || quantity <= 0) {
+    if (!quantityInput.trim() || quantity <= 0) {
       setErrorMessage('La cantidad debe ser mayor a 0.')
       return
     }
@@ -235,12 +236,12 @@ export const MovementModal: React.FC<MovementModalProps> = ({
             </div>
             <input
               id="mov-qty"
-              type="number"
-              step={isFractional ? '0.01' : '1'}
-              min="0.001"
+              type="text"
+              inputMode={isFractional ? 'decimal' : 'numeric'}
               required
-              value={quantity || ''}
-              onChange={(e) => setQuantity(parseFloat(e.target.value) || 0)}
+              value={quantityInput}
+              onChange={(e) => setQuantityInput(e.target.value)}
+              placeholder={isFractional ? 'Ej. 1,99' : 'Ej. 10'}
               className="w-full px-3 py-2 text-sm font-semibold border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-slate-900"
             />
           </div>

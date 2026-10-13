@@ -24,7 +24,12 @@ async def export_sales_xlsx(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: libsql_client.Client = Depends(get_db)
 ):
-    rows = await sale_repo.get_sales_export_rows(db, year=year, month=month)
+    rows = await sale_repo.get_sales_export_rows(
+        db,
+        business_id=current_user["business_id"],
+        year=year,
+        month=month
+    )
     workbook_bytes = build_sales_workbook(rows, year=year, month=month)
     filename = f"ventas_{year:04d}_{month:02d}.xlsx"
     return Response(
@@ -50,6 +55,7 @@ async def list_sales(
     offset = (page - 1) * page_size
     sales, total = await sale_repo.list_sales(
         client=db,
+        business_id=current_user["business_id"],
         month=month,
         year=year,
         status=status,
@@ -85,6 +91,7 @@ async def create_sale(
         sale = await sale_service.create_sale(
             client=db,
             data=payload,
+            business_id=current_user["business_id"],
             user_id=current_user["id"]
         )
         return sale
@@ -100,11 +107,11 @@ async def get_sale(
     """
     Obtiene los detalles completos de una venta específica incluyendo el desglose de sus productos.
     """
-    sale = await sale_repo.get_sale_by_id(db, sale_id)
+    sale = await sale_repo.get_sale_by_id(db, current_user["business_id"], sale_id)
     if not sale:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venta no encontrada.")
 
-    items = await sale_repo.get_sale_items(db, sale_id)
+    items = await sale_repo.get_sale_items(db, current_user["business_id"], sale_id)
     sale["items"] = items
     return sale
 
@@ -124,6 +131,7 @@ async def cancel_sale(
     try:
         sale = await sale_service.cancel_sale(
             client=db,
+            business_id=current_user["business_id"],
             sale_id=sale_id,
             reason=payload.cancellation_reason,
             user_id=current_user["id"]

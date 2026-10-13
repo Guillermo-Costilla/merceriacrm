@@ -12,7 +12,11 @@ ALLOWED_SORT_COLUMNS = {
     "updated_at": "p.updated_at",
 }
 
-async def get_product_by_id(client: libsql_client.Client, product_id: str) -> Optional[Dict[str, Any]]:
+async def get_product_by_id(
+    client: libsql_client.Client,
+    business_id: str,
+    product_id: str
+) -> Optional[Dict[str, Any]]:
     rs = await client.execute(
         """
         SELECT 
@@ -20,14 +24,18 @@ async def get_product_by_id(client: libsql_client.Client, product_id: str) -> Op
             c.name as category_name
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
-        WHERE p.id = ?
+        WHERE p.business_id = ? AND p.id = ?
         """,
-        [product_id]
+        [business_id, product_id]
     )
     rows = result_to_dicts(rs)
     return rows[0] if rows else None
 
-async def get_product_by_sku(client: libsql_client.Client, sku: str) -> Optional[Dict[str, Any]]:
+async def get_product_by_sku(
+    client: libsql_client.Client,
+    business_id: str,
+    sku: str
+) -> Optional[Dict[str, Any]]:
     rs = await client.execute(
         """
         SELECT 
@@ -35,9 +43,9 @@ async def get_product_by_sku(client: libsql_client.Client, sku: str) -> Optional
             c.name as category_name
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
-        WHERE p.sku = ? COLLATE NOCASE
+        WHERE p.business_id = ? AND p.sku = ? COLLATE NOCASE
         """,
-        [sku.strip().upper()]
+        [business_id, sku.strip().upper()]
     )
     rows = result_to_dicts(rs)
     return rows[0] if rows else None
@@ -50,65 +58,76 @@ async def create_product(
         """
         INSERT INTO products (
             id, sku, name, category_id, description, cost_cents, price_cents,
-            current_stock, min_stock, unit_of_measure, is_fractional, is_active
+            current_stock, min_stock, unit_of_measure, is_fractional, is_active, business_id
         ) VALUES (
             :id, :sku, :name, :category_id, :description, :cost_cents, :price_cents,
-            :current_stock, :min_stock, :unit_of_measure, :is_fractional, :is_active
+            :current_stock, :min_stock, :unit_of_measure, :is_fractional, :is_active, :business_id
         )
         """,
         product
     )
-    res = await get_product_by_id(client, product["id"])
+    res = await get_product_by_id(client, product["business_id"], product["id"])
     return res # type: ignore
 
 async def update_product(
     client: libsql_client.Client,
+    business_id: str,
     product_id: str,
     fields: Dict[str, Any]
 ) -> Dict[str, Any]:
     if not fields:
-        res = await get_product_by_id(client, product_id)
+        res = await get_product_by_id(client, business_id, product_id)
         return res # type: ignore
 
     set_clauses = [f"{k} = :{k}" for k in fields.keys()]
     set_clauses.append("updated_at = CURRENT_TIMESTAMP")
-    sql = f"UPDATE products SET {', '.join(set_clauses)} WHERE id = :id"
+    sql = f"UPDATE products SET {', '.join(set_clauses)} WHERE business_id = :business_id AND id = :id"
     
-    params = {**fields, "id": product_id}
+    params = {**fields, "business_id": business_id, "id": product_id}
     await client.execute(sql, params)
-    res = await get_product_by_id(client, product_id)
+    res = await get_product_by_id(client, business_id, product_id)
     return res # type: ignore
 
 async def set_product_active(
     client: libsql_client.Client,
+    business_id: str,
     product_id: str,
     is_active: bool
 ) -> None:
     await client.execute(
-        "UPDATE products SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        [1 if is_active else 0, product_id]
+        "UPDATE products SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE business_id = ? AND id = ?",
+        [1 if is_active else 0, business_id, product_id]
     )
 
 async def check_product_has_movements(
     client: libsql_client.Client,
+    business_id: str,
     product_id: str
 ) -> bool:
-    rs1 = await client.execute("SELECT COUNT(*) FROM sale_items WHERE product_id = ?", [product_id])
+    rs1 = await client.execute(
+        "SELECT COUNT(*) FROM sale_items si JOIN products p ON p.id = si.product_id WHERE p.business_id = ? AND si.product_id = ?",
+        [business_id, product_id]
+    )
     if rs1.rows and rs1.rows[0][0] > 0:
         return True
-    rs2 = await client.execute("SELECT COUNT(*) FROM inventory_movements WHERE product_id = ?", [product_id])
+    rs2 = await client.execute(
+        "SELECT COUNT(*) FROM inventory_movements WHERE business_id = ? AND product_id = ?",
+        [business_id, product_id]
+    )
     if rs2.rows and rs2.rows[0][0] > 0:
         return True
     return False
 
 async def delete_product_physical(
     client: libsql_client.Client,
+    business_id: str,
     product_id: str
 ) -> None:
-    await client.execute("DELETE FROM products WHERE id = ?", [product_id])
+    await client.execute("DELETE FROM products WHERE business_id = ? AND id = ?", [business_id, product_id])
 
 async def list_products(
     client: libsql_client.Client,
+    business_id: str,
     search: Optional[str] = None,
     category_id: Optional[str] = None,
     stock_status: Optional[str] = None,
@@ -118,8 +137,8 @@ async def list_products(
     limit: int = 50,
     offset: int = 0
 ) -> Tuple[List[Dict[str, Any]], int]:
-    where_clauses = ["1=1"]
-    params: List[Any] = []
+    where_clauses = ["p.business_id = ?"]
+    params: List[Any] = [business_id]
 
     if search:
         search_pattern = f"%{search.strip()}%"

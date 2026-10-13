@@ -2,6 +2,25 @@ import { apiFetch } from './api'
 import type { User, AuthMessageResponse } from '../types/auth'
 
 export const authService = {
+  async register(
+    businessName: string,
+    fullName: string,
+    email: string,
+    password: string,
+    businessLogo: string | null,
+  ): Promise<User> {
+    return apiFetch<User>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        business_name: businessName,
+        business_logo_data_url: businessLogo,
+        full_name: fullName,
+        email,
+        password,
+      }),
+    })
+  },
+
   async login(email: string, password: string): Promise<User> {
     return apiFetch<User>('/api/auth/login', {
       method: 'POST',

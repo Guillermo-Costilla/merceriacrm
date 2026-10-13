@@ -8,30 +8,78 @@ async def count_users(client: libsql_client.Client) -> int:
 
 async def get_user_by_email(client: libsql_client.Client, email: str) -> Optional[Dict[str, Any]]:
     rs = await client.execute(
-        "SELECT * FROM users WHERE email = ? COLLATE NOCASE",
+        """
+        SELECT u.*, b.business_name, b.logo_data_url AS business_logo_data_url
+        FROM users u
+        JOIN businesses b ON b.id = u.business_id
+        WHERE u.email = ? COLLATE NOCASE
+        """,
         [email.strip().lower()]
     )
     rows = result_to_dicts(rs)
     return rows[0] if rows else None
 
 async def get_user_by_id(client: libsql_client.Client, user_id: str) -> Optional[Dict[str, Any]]:
-    rs = await client.execute("SELECT * FROM users WHERE id = ?", [user_id])
+    rs = await client.execute(
+        """
+        SELECT u.*, b.business_name, b.logo_data_url AS business_logo_data_url
+        FROM users u
+        JOIN businesses b ON b.id = u.business_id
+        WHERE u.id = ?
+        """,
+        [user_id]
+    )
     rows = result_to_dicts(rs)
     return rows[0] if rows else None
+
+async def create_business_account(
+    client: libsql_client.Client,
+    business_id: str,
+    business_name: str,
+    business_logo_data_url: Optional[str],
+    user_id: str,
+    email: str,
+    password_hash: str,
+    full_name: str
+) -> Dict[str, Any]:
+    await client.batch([
+        libsql_client.Statement(
+            "INSERT INTO businesses (id, business_name, logo_data_url) VALUES (?, ?, ?)",
+            [business_id, business_name.strip(), business_logo_data_url]
+        ),
+        libsql_client.Statement(
+            """
+            INSERT INTO business_settings (
+                id, business_name, report_title, currency_code, currency_symbol, timezone, contact_email
+            ) VALUES (?, ?, 'Reporte de Gestión y Ventas', 'ARS', '$', 'America/Argentina/Tucuman', ?)
+            """,
+            [business_id, business_name.strip(), email.strip().lower()]
+        ),
+        libsql_client.Statement(
+            """
+            INSERT INTO users (id, business_id, email, password_hash, full_name, is_active, failed_login_attempts)
+            VALUES (?, ?, ?, ?, ?, 1, 0)
+            """,
+            [user_id, business_id, email.strip().lower(), password_hash, full_name.strip()]
+        )
+    ])
+    user = await get_user_by_id(client, user_id)
+    return user # type: ignore
 
 async def create_user(
     client: libsql_client.Client,
     user_id: str,
+    business_id: str,
     email: str,
     password_hash: str,
     full_name: str
 ) -> Dict[str, Any]:
     await client.execute(
         """
-        INSERT INTO users (id, email, password_hash, full_name, is_active, failed_login_attempts)
-        VALUES (?, ?, ?, ?, 1, 0)
+        INSERT INTO users (id, business_id, email, password_hash, full_name, is_active, failed_login_attempts)
+        VALUES (?, ?, ?, ?, ?, 1, 0)
         """,
-        [user_id, email.strip().lower(), password_hash, full_name.strip()]
+        [user_id, business_id, email.strip().lower(), password_hash, full_name.strip()]
     )
     user = await get_user_by_id(client, user_id)
     return user # type: ignore
@@ -93,12 +141,16 @@ async def get_session_with_user(
             s.expires_at,
             s.user_id,
             u.id as user_id,
+            u.business_id,
             u.email,
             u.full_name,
             u.is_active,
-            u.created_at
+            u.created_at,
+            b.business_name,
+            b.logo_data_url AS business_logo_data_url
         FROM sessions s
         JOIN users u ON s.user_id = u.id
+        JOIN businesses b ON b.id = u.business_id
         WHERE s.token_hash = ?
         """,
         [token_hash]

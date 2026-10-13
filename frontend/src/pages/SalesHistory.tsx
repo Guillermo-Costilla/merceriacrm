@@ -18,6 +18,7 @@ import type { Sale } from '../types/sale'
 import { saleService } from '../services/saleService'
 import { formatCurrency, formatQuantity, formatDateTime } from '../utils/formatters'
 import { ApiError } from '../services/api'
+import { getBusinessYearMonth } from '../utils/formatters'
 
 export const SalesHistory: React.FC = () => {
   const [sales, setSales] = useState<Sale[]>([])
@@ -26,9 +27,9 @@ export const SalesHistory: React.FC = () => {
   const [actionNotice, setActionNotice] = useState<string | null>(null)
 
   // Filtros
-  const currentDate = new Date()
-  const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear())
-  const [selectedMonth, setSelectedMonth] = useState<number>(currentDate.getMonth() + 1)
+  const currentPeriod = getBusinessYearMonth()
+  const [selectedYear, setSelectedYear] = useState<number>(currentPeriod.year)
+  const [selectedMonth, setSelectedMonth] = useState<number>(currentPeriod.month)
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [debouncedSearch, setDebouncedSearch] = useState<string>('')

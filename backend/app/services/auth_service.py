@@ -34,11 +34,50 @@ async def create_initial_admin(
     user = await auth_repo.create_user(
         client=client,
         user_id=user_id,
+        business_id="legacy-business",
         email=email,
         password_hash=pw_hash,
         full_name=full_name
     )
     return user
+
+async def register_business(
+    client: libsql_client.Client,
+    business_name: str,
+    business_logo_data_url: Optional[str],
+    email: str,
+    password: str,
+    full_name: str,
+    user_agent: Optional[str] = None,
+    ip_address: Optional[str] = None
+) -> Tuple[Dict[str, Any], str]:
+    if await auth_repo.get_user_by_email(client, email):
+        raise AuthError("Ya existe un usuario registrado con este correo electrónico", status_code=409)
+
+    business_id = str(uuid.uuid4())
+    user_id = str(uuid.uuid4())
+    user = await auth_repo.create_business_account(
+        client=client,
+        business_id=business_id,
+        business_name=business_name,
+        business_logo_data_url=business_logo_data_url,
+        user_id=user_id,
+        email=email,
+        password_hash=security.hash_password(password),
+        full_name=full_name
+    )
+
+    raw_token = security.generate_secure_token(32)
+    await auth_repo.create_session(
+        client=client,
+        session_id=str(uuid.uuid4()),
+        user_id=user_id,
+        token_hash=security.hash_token(raw_token),
+        expires_at=security.get_session_expiry(),
+        user_agent=user_agent,
+        ip_address=ip_address
+    )
+    return user, raw_token
 
 async def login_user(
     client: libsql_client.Client,
@@ -145,6 +184,9 @@ async def get_current_user_from_token(
 
     return {
         "id": session["user_id"],
+        "business_id": session["business_id"],
+        "business_name": session["business_name"],
+        "business_logo_data_url": session["business_logo_data_url"],
         "email": session["email"],
         "full_name": session["full_name"],
         "is_active": bool(session["is_active"]),

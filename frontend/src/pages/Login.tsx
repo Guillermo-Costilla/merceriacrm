@@ -3,25 +3,65 @@ import { motion, AnimatePresence } from 'motion/react'
 import { 
   Lock, 
   Mail, 
+  Upload,
   Eye, 
   EyeOff, 
   AlertCircle, 
   CheckCircle2, 
   RefreshCw, 
-  HelpCircle,
+  Moon,
+  Sun,
   X
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { authService } from '../services/authService'
 import { ApiError } from '../services/api'
 
-export const Login: React.FC = () => {
-  const { login } = useAuth()
+interface LoginProps {
+  isDarkTheme: boolean
+  onToggleTheme: () => void
+}
+
+export const Login: React.FC<LoginProps> = ({ isDarkTheme, onToggleTheme }) => {
+  const { login, register } = useAuth()
+  const [isRegistering, setIsRegistering] = useState(false)
+  const [businessName, setBusinessName] = useState('')
+  const [businessLogo, setBusinessLogo] = useState<string | null>(null)
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setErrorMessage('El logo debe ser una imagen PNG, JPG o WEBP.')
+      event.target.value = ''
+      return
+    }
+
+    if (file.size > 512 * 1024) {
+      setErrorMessage('El logo no puede superar los 512 KB.')
+      event.target.value = ''
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        setErrorMessage('No se pudo leer el archivo del logo.')
+        return
+      }
+      setBusinessLogo(reader.result)
+      setErrorMessage(null)
+    }
+    reader.onerror = () => setErrorMessage('No se pudo leer el archivo del logo.')
+    reader.readAsDataURL(file)
+  }
 
   // Modal de recuperación
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false)
@@ -36,7 +76,11 @@ export const Login: React.FC = () => {
     setLoading(true)
 
     try {
-      await login(email, password)
+      if (isRegistering) {
+        await register(businessName, fullName, email, password, businessLogo)
+      } else {
+        await login(email, password)
+      }
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         setErrorMessage(err.message)
@@ -69,7 +113,17 @@ export const Login: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-rose-50/50 via-slate-50 to-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="relative min-h-screen bg-gradient-to-b from-rose-50/50 via-slate-50 to-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <button
+        type="button"
+        onClick={onToggleTheme}
+        aria-label={isDarkTheme ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+        title={isDarkTheme ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+        className="absolute right-4 top-4 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+      >
+        {isDarkTheme ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        {isDarkTheme ? 'Tema claro' : 'Tema oscuro'}
+      </button>
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <motion.div 
           initial={{ scale: 0.9, opacity: 0 }}
@@ -80,7 +134,7 @@ export const Login: React.FC = () => {
           <img
             src="/trazos-logo.jpg"
             alt="Trazos Librería"
-            className="h-48 w-48 rounded-2xl object-contain"
+            className="h-40 w-40 rounded-2xl object-contain"
           />
         </motion.div>
         <motion.h2 
@@ -109,8 +163,14 @@ export const Login: React.FC = () => {
       >
         <div className="bg-white py-8 px-6 shadow-sm border border-slate-200 rounded-2xl sm:px-10">
           <div className="mb-6">
-            <h3 className="text-base font-semibold text-slate-800">Iniciar Sesión</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Ingrese sus credenciales de administrador para acceder</p>
+            <h3 className="text-base font-semibold text-slate-800">
+              {isRegistering ? 'Crear cuenta de tu comercio' : 'Iniciar Sesión'}
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {isRegistering
+                ? 'Tu catálogo, inventario y ventas serán privados para tu comercio.'
+                : 'Ingresa tus credenciales para acceder a tu comercio.'}
+            </p>
           </div>
 
           {errorMessage && (
@@ -125,6 +185,78 @@ export const Login: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {isRegistering && (
+              <>
+                <div>
+                  <label htmlFor="business-name" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Nombre del comercio
+                  </label>
+                  <input
+                    id="business-name"
+                    type="text"
+                    required
+                    minLength={2}
+                    maxLength={100}
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    placeholder="Mi comercio"
+                    className="block w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-slate-900 placeholder:text-slate-400 bg-white transition-all outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="business-logo" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Logo del comercio <span className="font-normal text-slate-400">(opcional)</span>
+                  </label>
+                  <div className="flex items-center gap-3">
+                    {businessLogo ? (
+                      <img src={businessLogo} alt="Vista previa del logo" className="h-12 w-12 rounded-lg border border-slate-200 object-contain p-1" />
+                    ) : (
+                      <div className="h-12 w-12 rounded-lg border border-dashed border-slate-300 bg-slate-50" />
+                    )}
+                    <label
+                      htmlFor="business-logo"
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                    >
+                      <Upload className="h-4 w-4" />
+                      {businessLogo ? 'Cambiar logo' : 'Elegir archivo'}
+                    </label>
+                    {businessLogo && (
+                      <button
+                        type="button"
+                        onClick={() => setBusinessLogo(null)}
+                        className="text-xs font-medium text-slate-500 hover:text-red-600"
+                      >
+                        Quitar
+                      </button>
+                    )}
+                    <input
+                      id="business-logo"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={handleLogoChange}
+                      className="sr-only"
+                    />
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-slate-500">PNG, JPG o WEBP; máximo 512 KB. Se usará en la aplicación y como favicon.</p>
+                </div>
+                <div>
+                  <label htmlFor="full-name" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Tu nombre completo
+                  </label>
+                  <input
+                    id="full-name"
+                    type="text"
+                    required
+                    minLength={2}
+                    maxLength={100}
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Nombre y apellido"
+                    className="block w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-slate-900 placeholder:text-slate-400 bg-white transition-all outline-none"
+                  />
+                </div>
+              </>
+            )}
             <div>
               <label htmlFor="email" className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Correo Electrónico
@@ -166,6 +298,7 @@ export const Login: React.FC = () => {
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   required
+                  minLength={isRegistering ? 8 : 1}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -194,25 +327,26 @@ export const Login: React.FC = () => {
                     Iniciando sesión...
                   </>
                 ) : (
-                  'Ingresar al Sistema'
+                  isRegistering ? 'Crear cuenta y continuar' : 'Ingresar al Sistema'
                 )}
               </button>
             </div>
           </form>
 
           <div className="mt-6 pt-5 border-t border-slate-100">
-            <div className="flex items-start space-x-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200/60">
-              <HelpCircle className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-slate-700">Acceso Privado para el Propietario</p>
-                <p className="mt-0.5 text-slate-500">
-                  Para crear la cuenta del propietario en la primera instalación ejecute en la terminal:
-                  <code className="block mt-1 font-mono text-[11px] bg-slate-200/70 text-slate-800 px-1.5 py-0.5 rounded">
-                    pnpm run admin:create
-                  </code>
-                </p>
-              </div>
-            </div>
+            <p className="mb-3 text-center text-xs text-slate-600">
+              {isRegistering ? '¿Ya tienes una cuenta?' : '¿Primera vez aquí?'}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegistering(!isRegistering)
+                setErrorMessage(null)
+              }}
+              className="w-full flex justify-center items-center py-2.5 px-4 border border-rose-200 rounded-xl text-sm font-semibold text-rose-700 bg-white hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 transition-all"
+            >
+              {isRegistering ? 'Volver a iniciar sesión' : 'Crear cuenta de mi comercio'}
+            </button>
           </div>
         </div>
       </motion.div>

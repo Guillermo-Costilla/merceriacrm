@@ -20,7 +20,7 @@ import {
 } from 'recharts'
 import type { DashboardSummary } from '../types/dashboard'
 import { dashboardService } from '../services/dashboardService'
-import { formatCurrency, formatQuantity } from '../utils/formatters'
+import { formatCurrency, formatQuantity, getBusinessYearMonth } from '../utils/formatters'
 import { ApiError } from '../services/api'
 
 interface DashboardProps {
@@ -29,9 +29,9 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToPOS, onNavigateToStockAlerts }) => {
-  const currentDate = new Date()
-  const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear())
-  const [selectedMonth, setSelectedMonth] = useState<number>(currentDate.getMonth() + 1)
+  const currentPeriod = getBusinessYearMonth()
+  const [selectedYear, setSelectedYear] = useState<number>(currentPeriod.year)
+  const [selectedMonth, setSelectedMonth] = useState<number>(currentPeriod.month)
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)

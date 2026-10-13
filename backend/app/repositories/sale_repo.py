@@ -2,37 +2,52 @@ import libsql_client
 from typing import List, Optional, Dict, Any, Tuple
 from app.core.database import result_to_dicts
 
-async def get_next_sale_number(client: libsql_client.Client) -> int:
-    rs = await client.execute("SELECT COALESCE(MAX(sale_number), 0) + 1 FROM sales")
+async def get_next_sale_number(client: libsql_client.Client, business_id: str) -> int:
+    rs = await client.execute(
+        "SELECT COALESCE(MAX(sale_number), 0) + 1 FROM sales WHERE business_id = ?",
+        [business_id]
+    )
     return int(rs.rows[0][0]) if rs.rows else 1
 
-async def get_sale_by_id(client: libsql_client.Client, sale_id: str) -> Optional[Dict[str, Any]]:
+async def get_sale_by_id(
+    client: libsql_client.Client,
+    business_id: str,
+    sale_id: str
+) -> Optional[Dict[str, Any]]:
     sql = """
         SELECT 
             s.*,
             u.full_name as created_by_user_name
         FROM sales s
         LEFT JOIN users u ON s.created_by_user_id = u.id
-        WHERE s.id = ?
+        WHERE s.business_id = ? AND s.id = ?
     """
-    rs = await client.execute(sql, [sale_id])
+    rs = await client.execute(sql, [business_id, sale_id])
     rows = result_to_dicts(rs)
     return rows[0] if rows else None
 
-async def get_sale_by_idempotency_key(client: libsql_client.Client, key: str) -> Optional[Dict[str, Any]]:
+async def get_sale_by_idempotency_key(
+    client: libsql_client.Client,
+    business_id: str,
+    key: str
+) -> Optional[Dict[str, Any]]:
     sql = """
         SELECT 
             s.*,
             u.full_name as created_by_user_name
         FROM sales s
         LEFT JOIN users u ON s.created_by_user_id = u.id
-        WHERE s.idempotency_key = ?
+        WHERE s.business_id = ? AND s.idempotency_key = ?
     """
-    rs = await client.execute(sql, [key.strip()])
+    rs = await client.execute(sql, [business_id, key.strip()])
     rows = result_to_dicts(rs)
     return rows[0] if rows else None
 
-async def get_sale_items(client: libsql_client.Client, sale_id: str) -> List[Dict[str, Any]]:
+async def get_sale_items(
+    client: libsql_client.Client,
+    business_id: str,
+    sale_id: str
+) -> List[Dict[str, Any]]:
     sql = """
         SELECT 
             si.*,
@@ -40,14 +55,16 @@ async def get_sale_items(client: libsql_client.Client, sale_id: str) -> List[Dic
             p.sku as product_sku
         FROM sale_items si
         JOIN products p ON si.product_id = p.id
-        WHERE si.sale_id = ?
+        JOIN sales s ON si.sale_id = s.id
+        WHERE s.business_id = ? AND si.sale_id = ?
         ORDER BY si.rowid ASC
     """
-    rs = await client.execute(sql, [sale_id])
+    rs = await client.execute(sql, [business_id, sale_id])
     return result_to_dicts(rs)
 
 async def list_sales(
     client: libsql_client.Client,
+    business_id: str,
     month: Optional[int] = None,
     year: Optional[int] = None,
     status: Optional[str] = None,
@@ -55,8 +72,8 @@ async def list_sales(
     limit: int = 50,
     offset: int = 0
 ) -> Tuple[List[Dict[str, Any]], int]:
-    where_clauses = ["1=1"]
-    params: List[Any] = []
+    where_clauses = ["s.business_id = ?"]
+    params: List[Any] = [business_id]
 
     # Filtrado por año y mes (interpretado en hora UTC o estándar ISO)
     if year and month:
@@ -100,6 +117,7 @@ async def list_sales(
 
 async def get_sales_export_rows(
     client: libsql_client.Client,
+    business_id: str,
     year: int,
     month: int
 ) -> List[Dict[str, Any]]:
@@ -127,8 +145,8 @@ async def get_sales_export_rows(
         FROM sales s
         LEFT JOIN sale_items si ON si.sale_id = s.id
         LEFT JOIN products p ON p.id = si.product_id
-        WHERE strftime('%Y-%m', s.sale_date) = ?
+        WHERE s.business_id = ? AND strftime('%Y-%m', s.sale_date) = ?
         ORDER BY s.sale_date ASC, s.sale_number ASC, si.rowid ASC
     """
-    result = await client.execute(sql, [period])
+    result = await client.execute(sql, [business_id, period])
     return result_to_dicts(result)
